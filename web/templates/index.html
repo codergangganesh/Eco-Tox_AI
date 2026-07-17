@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="EcoTox-AI: AI-powered aquatic toxicity prediction platform. Predict LC50 values instantly using machine learning trained on 908+ chemicals.">
+    <title>EcoTox-AI | Aquatic Toxicity Prediction</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <!-- Animated Background Particles -->
+    <div class="bg-particles" id="particles"></div>
+    
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="nav-icon">🧪</span>
+            <span class="nav-title">EcoTox-AI</span>
+            <span class="nav-badge">v1.0</span>
+        </div>
+        <div class="nav-links">
+            <a href="#predictor" class="nav-link active" data-section="predictor">Predictor</a>
+            <a href="#dashboard" class="nav-link" data-section="dashboard">Dashboard</a>
+            <a href="#about" class="nav-link" data-section="about">About</a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="hero">
+        <div class="hero-content">
+            <h1 class="hero-title">
+                <span class="hero-icon">🧬</span>
+                Aquatic Toxicity
+                <span class="gradient-text">Prediction</span>
+            </h1>
+            <p class="hero-subtitle">
+                Predict the ecotoxicity of chemical compounds instantly using AI trained on 908+ chemicals.
+                <br>Replace weeks of wet-lab bioassays with seconds of computation.
+            </p>
+            <div class="hero-stats">
+                <div class="stat-card">
+                    <span class="stat-value">908+</span>
+                    <span class="stat-label">Chemicals Trained</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value">9</span>
+                    <span class="stat-label">ML Algorithms</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value">&lt;1s</span>
+                    <span class="stat-label">Prediction Time</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Predictor Section -->
+    <section id="predictor" class="section active-section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">⚗️ Toxicity Predictor</h2>
+                <p class="section-desc">Enter the molecular descriptors of your compound to get an instant LC50 prediction.</p>
+            </div>
+
+            <div class="predictor-grid">
+                <!-- Input Form -->
+                <div class="glass-card input-card">
+                    <h3 class="card-title">Molecular Descriptors</h3>
+                    <form id="prediction-form">
+                        <div class="input-grid">
+                            <div class="input-group">
+                                <label for="CIC0">CIC0</label>
+                                <input type="number" id="CIC0" name="CIC0" step="any" placeholder="e.g., 1.732" required>
+                                <span class="input-hint">Complementary Information Content</span>
+                            </div>
+                            <div class="input-group">
+                                <label for="SM1_Dz_Z">SM1_Dz(Z)</label>
+                                <input type="number" id="SM1_Dz_Z" name="SM1_Dz_Z" step="any" placeholder="e.g., 1.393" required>
+                                <span class="input-hint">Spectral Moment Descriptor</span>
+                            </div>
+                            <div class="input-group">
+                                <label for="GATS1i">GATS1i</label>
+                                <input type="number" id="GATS1i" name="GATS1i" step="any" placeholder="e.g., 0.849" required>
+                                <span class="input-hint">Geary Autocorrelation</span>
+                            </div>
+                            <div class="input-group">
+                                <label for="NdsCH">NdsCH</label>
+                                <input type="number" id="NdsCH" name="NdsCH" step="any" placeholder="e.g., 1" required>
+                                <span class="input-hint">=CH- fragment count</span>
+                            </div>
+                            <div class="input-group">
+                                <label for="NdssC">NdssC</label>
+                                <input type="number" id="NdssC" name="NdssC" step="any" placeholder="e.g., 0" required>
+                                <span class="input-hint">=C< fragment count</span>
+                            </div>
+                            <div class="input-group">
+                                <label for="MLOGP">MLOGP</label>
+                                <input type="number" id="MLOGP" name="MLOGP" step="any" placeholder="e.g., 2.246" required>
+                                <span class="input-hint">Moriguchi LogP (Lipophilicity)</span>
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="predict-btn">
+                                <span class="btn-icon">🔬</span>
+                                <span class="btn-text">Predict Toxicity</span>
+                                <span class="btn-loader" style="display:none;">⏳</span>
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="example-btn">
+                                <span class="btn-icon">📋</span>
+                                <span class="btn-text">Load Example</span>
+                            </button>
+                            <button type="reset" class="btn btn-ghost">
+                                <span class="btn-icon">🔄</span>
+                                <span class="btn-text">Reset</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Results Panel -->
+                <div class="glass-card result-card" id="result-card" style="display:none;">
+                    <h3 class="card-title">Prediction Result</h3>
+                    
+                    <!-- Toxicity Gauge -->
+                    <div class="gauge-container">
+                        <div class="gauge">
+                            <svg viewBox="0 0 200 120" class="gauge-svg">
+                                <defs>
+                                    <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" style="stop-color:#00CC00" />
+                                        <stop offset="33%" style="stop-color:#FFAA00" />
+                                        <stop offset="66%" style="stop-color:#FF6600" />
+                                        <stop offset="100%" style="stop-color:#FF0000" />
+                                    </linearGradient>
+                                </defs>
+                                <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="12" stroke-linecap="round"/>
+                                <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#gaugeGradient)" stroke-width="12" stroke-linecap="round" id="gauge-arc" stroke-dasharray="0 251.2"/>
+                                <circle cx="100" cy="100" r="4" fill="white" id="gauge-needle-base"/>
+                                <line x1="100" y1="100" x2="100" y2="30" stroke="white" stroke-width="2" stroke-linecap="round" id="gauge-needle" transform="rotate(-90, 100, 100)"/>
+                            </svg>
+                        </div>
+                        <div class="gauge-value" id="gauge-value">--</div>
+                        <div class="gauge-unit">-LOG(mol/L)</div>
+                    </div>
+
+                    <!-- Classification Badge -->
+                    <div class="classification-badge" id="classification-badge">
+                        <span class="badge-emoji" id="badge-emoji">🔬</span>
+                        <span class="badge-text" id="badge-text">Awaiting prediction...</span>
+                    </div>
+
+                    <!-- Details -->
+                    <div class="result-details" id="result-details" style="display:none;">
+                        <div class="detail-row">
+                            <span class="detail-label">Predicted LC50</span>
+                            <span class="detail-value" id="detail-lc50">--</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Toxicity Class</span>
+                            <span class="detail-value" id="detail-class">--</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Model Used</span>
+                            <span class="detail-value" id="detail-model">{{ model_info.get('best_model_name', 'N/A') }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Toxicity Scale Reference -->
+            <div class="glass-card scale-card">
+                <h3 class="card-title">📊 Toxicity Classification Scale</h3>
+                <div class="scale-bar">
+                    <div class="scale-segment safe">
+                        <span class="scale-label">✅ Low</span>
+                        <span class="scale-range">&lt; 3.0</span>
+                    </div>
+                    <div class="scale-segment moderate">
+                        <span class="scale-label">⚡ Moderate</span>
+                        <span class="scale-range">3.0 – 4.5</span>
+                    </div>
+                    <div class="scale-segment high">
+                        <span class="scale-label">⚠️ High</span>
+                        <span class="scale-range">4.5 – 6.0</span>
+                    </div>
+                    <div class="scale-segment very-high">
+                        <span class="scale-label">☠️ Very High</span>
+                        <span class="scale-range">&gt; 6.0</span>
+                    </div>
+                </div>
+                <p class="scale-note">Values shown in -LOG(mol/L). Higher values indicate greater toxicity (lower actual concentration needed to be lethal).</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Dashboard Section -->
+    <section id="dashboard" class="section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">📈 Model Dashboard</h2>
+                <p class="section-desc">Compare performance across all trained machine learning algorithms.</p>
+            </div>
+
+            {% if comparison_data %}
+            <!-- Model Comparison Chart -->
+            <div class="glass-card chart-card">
+                <h3 class="card-title">Model Performance Comparison</h3>
+                <div class="chart-container">
+                    <canvas id="comparison-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Model Table -->
+            <div class="glass-card table-card">
+                <h3 class="card-title">Detailed Metrics</h3>
+                <div class="table-wrapper">
+                    <table class="metrics-table" id="metrics-table">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Model</th>
+                                <th>R² Score</th>
+                                <th>RMSE</th>
+                                <th>MAE</th>
+                                <th>MAPE (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for model in comparison_data %}
+                            <tr class="{% if loop.index <= 3 %}top-model{% endif %}">
+                                <td>
+                                    {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}
+                                </td>
+                                <td class="model-name">{{ model.get('Model', 'N/A') }}</td>
+                                <td>{{ "%.4f"|format(model.get('R²', 0)) }}</td>
+                                <td>{{ "%.4f"|format(model.get('RMSE', 0)) }}</td>
+                                <td>{{ "%.4f"|format(model.get('MAE', 0)) }}</td>
+                                <td>{{ "%.1f"|format(model.get('MAPE (%)', 0)) }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Training & Evaluation Visualizations -->
+            <div class="glass-card plots-card">
+                <h3 class="card-title">🔬 Model Training Visualizations</h3>
+                <p class="plots-section-desc">These visual plots are generated dynamically during model training to diagnose model fitting, prediction error, and feature dependencies.</p>
+                <div class="plots-grid">
+                    <div class="plot-item">
+                        <h4>Predicted vs. Actual LC50</h4>
+                        <p class="plot-desc">Scatter plots displaying actual vs. predicted values for all models. A tighter alignment along the diagonal red line indicates higher accuracy.</p>
+                        <div class="plot-img-container">
+                            <img src="/outputs/plots/predicted_vs_actual.png" alt="Predicted vs Actual Scatter Plot" class="plot-img">
+                        </div>
+                    </div>
+                    <div class="plot-item">
+                        <h4>Residual Error Distributions</h4>
+                        <p class="plot-desc">Histograms of residuals (actual - predicted values) for each model. Narrow distributions centered at 0 indicate low prediction bias and low variance.</p>
+                        <div class="plot-img-container">
+                            <img src="/outputs/plots/residuals.png" alt="Residuals Histogram" class="plot-img">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="glass-card empty-state">
+                <span class="empty-icon">🚀</span>
+                <h3>No Model Data Yet</h3>
+                <p>Run <code>python train.py</code> to train models and see comparison results here.</p>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">🧬 About EcoTox-AI</h2>
+                <p class="section-desc">Understanding the science behind the predictions.</p>
+            </div>
+
+            <div class="about-grid">
+                <div class="glass-card about-card">
+                    <span class="about-icon">🔬</span>
+                    <h3>The Problem</h3>
+                    <p>Traditional ecotoxicity testing requires culturing aquatic organisms for 48-96 hours per compound. Testing a single chemical can take weeks and cost thousands of dollars.</p>
+                </div>
+                <div class="glass-card about-card">
+                    <span class="about-icon">🤖</span>
+                    <h3>Our Solution</h3>
+                    <p>EcoTox-AI uses machine learning trained on 908+ known chemicals to predict the LC50 (lethal concentration) for new compounds in under a second.</p>
+                </div>
+                <div class="glass-card about-card">
+                    <span class="about-icon">📊</span>
+                    <h3>The Data</h3>
+                    <p>Trained on the UCI QSAR Fish Toxicity dataset — 96-hour LC50 measurements for fathead minnow (Pimephales promelas) with 6 molecular descriptors.</p>
+                </div>
+                <div class="glass-card about-card">
+                    <span class="about-icon">⚙️</span>
+                    <h3>The Models</h3>
+                    <p>9 algorithms compared: Ridge, Lasso, ElasticNet, Random Forest, Gradient Boosting, XGBoost, SVR, KNN, and Deep Neural Networks. The best model is selected automatically.</p>
+                </div>
+            </div>
+
+            <!-- Feature Descriptions -->
+            <div class="glass-card features-card">
+                <h3 class="card-title">📝 Molecular Descriptors Explained</h3>
+                <div class="features-grid">
+                    <div class="feature-item">
+                        <span class="feature-name">CIC0</span>
+                        <span class="feature-desc">Complementary Information Content — measures molecular complexity and information richness of the chemical graph.</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-name">SM1_Dz(Z)</span>
+                        <span class="feature-desc">Spectral Moment from Barysz matrix weighted by atomic number — captures electronic structure information.</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-name">GATS1i</span>
+                        <span class="feature-desc">Geary Autocorrelation lag 1 weighted by ionization potential — encodes how atomic properties distribute spatially.</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-name">NdsCH</span>
+                        <span class="feature-desc">Count of =CH- fragments — number of doubly-bonded CH groups in the molecule.</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-name">NdssC</span>
+                        <span class="feature-desc">Count of =C&lt; fragments — number of carbon atoms with two double bonds.</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-name">MLOGP</span>
+                        <span class="feature-desc">Moriguchi LogP — lipophilicity measure indicating how easily a compound enters biological membranes. Key driver of aquatic toxicity.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>🧪 EcoTox-AI — Aquatic Toxicity Prediction Platform</p>
+            <p class="footer-sub">Built with scikit-learn, XGBoost, TensorFlow, and Flask | Dataset: UCI QSAR Fish Toxicity</p>
+        </div>
+    </footer>
+
+    <script>
+        // Pass comparison data to JS safely
+        window.comparisonData = {{ comparison_data | tojson | safe }};
+    </script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

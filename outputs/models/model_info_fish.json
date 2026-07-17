@@ -1,0 +1,22 @@
+{
+  "best_model_name": "Deep MLP (Neural Network)",
+  "best_cv_r2": 0.6948539549022916,
+  "best_params": {
+    "hidden_layers": "[128, 128, 64]",
+    "dropout_rates": "[0.3, 0.25, 0.2]",
+    "lr": "0.0008"
+  },
+  "feature_names": [
+    "CIC0",
+    "SM1_Dz_Z",
+    "GATS1i",
+    "NdsCH",
+    "NdssC",
+    "MLOGP"
+  ],
+  "training_samples": 568,
+  "test_samples": 142,
+  "n_features": 6,
+  "total_models_trained": 11,
+  "training_time_seconds": 867.5
+}

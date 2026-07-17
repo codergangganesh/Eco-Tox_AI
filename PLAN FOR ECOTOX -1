@@ -1,0 +1,325 @@
+# EcoTox-AI: Aquatic Toxicity Prediction Platform
+
+An AI-powered platform that predicts the ecotoxicity (LC50) of chemical compounds using molecular descriptors and machine learning, replacing weeks of wet-lab bioassays with instant predictions.
+
+## Background
+
+Traditional ecotoxicity testing requires culturing aquatic organisms (fish, daphnia) for 48–96 hours per compound. EcoTox-AI learns from thousands of known toxicity measurements to predict the **96-hour LC50** (Lethal Concentration killing 50% of test fish) for new molecules — reducing weeks of lab work to seconds.
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Dataset**: We will use the **UCI QSAR Fish Toxicity Dataset** (908 chemicals, 6 molecular descriptors, LC50 for fathead minnow). You need to download this and place it in the project's `data/` folder. Download links are provided at the bottom of this plan.
+
+> [!IMPORTANT]
+> **Multi-Algorithm Training**: The plan trains **7 different algorithms** and builds an **ensemble/consensus model** from the top performers. This is the industry best practice — not a single-model approach.
+
+> [!WARNING]
+> **Python Environment**: This project requires Python 3.9+ with scientific libraries (scikit-learn, XGBoost, TensorFlow/Keras, pandas, etc.). We will create a `requirements.txt` and set up a virtual environment.
+
+---
+
+## Open Questions
+
+> [!IMPORTANT]
+> **Deployment preference**: The plan includes a polished web interface (Flask + HTML/CSS/JS). Is a web app the right deployment target, or would you prefer a Jupyter notebook-only approach?
+
+> [!NOTE]
+> **Future expansion**: After Phase 1 (fish LC50), would you want to expand to Daphnia EC50, algae toxicity, or bioaccumulation (BCF) in a Phase 2?
+
+---
+
+## Project Architecture
+
+```
+EcoToxAI/
+├── data/
+│   └── qsar_fish_toxicity.csv          # UCI Dataset (you download)
+├── src/
+│   ├── __init__.py
+│   ├── data_loader.py                  # Load & validate CSV data
+│   ├── preprocessing.py                # Feature scaling, outlier removal, train/test split
+│   ├── feature_engineering.py          # Additional descriptor computation
+│   ├── algorithms/
+│   │   ├── regression/
+│   │   ├── linear_regression_models.py       # Ridge, Lasso, ElasticNet
+│   │   ├── tree_based_regression_models.py   # Random Forest, Gradient Boosting, XGBoost
+│   │   ├── support_vector_regression.py      # Support Vector Regression
+│   │   ├── knn_regression.py                 # K-Nearest Neighbors regression
+│   │   ├── neural_network_regression.py      # Deep MLP regression
+│   │   └── ensemble_regression.py            # Stacking/Voting regression ensembles
+│   ├── evaluation.py                   # Metrics, cross-validation, comparison
+│   ├── explainability.py              # Feature importance, SHAP values
+│   └── predict.py                      # Prediction pipeline for new compounds
+├── web/
+│   ├── app.py                          # Flask web application
+│   ├── templates/
+│   │   └── index.html                  # Main web interface
+│   └── static/
+│       ├── css/
+│       │   └── style.css               # Premium dark-mode styling
+│       └── js/
+│           └── app.js                  # Frontend interactivity
+├── notebooks/
+│   └── exploration.ipynb               # EDA & model comparison notebook (optional)
+├── outputs/
+│   ├── models/                         # Saved trained models (.joblib/.h5)
+│   ├── plots/                          # Comparison charts, feature importance
+│   └── results/                        # Metrics CSV, model comparison report
+├── train.py                            # Master training script
+├── requirements.txt                    # All Python dependencies
+└── README.md                           # Project documentation
+```
+
+---
+
+## Proposed Changes
+
+### Phase 1 — Data & Environment Setup
+
+#### [NEW] [requirements.txt](file:///d:/EcoToxAI/requirements.txt)
+All Python dependencies:
+```
+pandas>=2.0
+numpy>=1.24
+scikit-learn>=1.3
+xgboost>=2.0
+tensorflow>=2.15
+keras>=3.0
+flask>=3.0
+shap>=0.43
+matplotlib>=3.8
+seaborn>=0.13
+joblib>=1.3
+scipy>=1.11
+```
+
+#### [NEW] [data/README.md](file:///d:/EcoToxAI/data/README.md)
+Instructions for placing the downloaded dataset file.
+
+---
+
+### Phase 2 — Data Pipeline
+
+#### [NEW] [src/data_loader.py](file:///d:/EcoToxAI/src/data_loader.py)
+- Load CSV with proper column names: `CIC0`, `SM1_Dz(Z)`, `GATS1i`, `NdsCH`, `NdssC`, `MLOGP` → features; `LC50` → target
+- Validate data integrity (no nulls, correct types, value ranges)
+- Basic statistics summary
+
+#### [NEW] [src/preprocessing.py](file:///d:/EcoToxAI/src/preprocessing.py)
+- **Outlier detection & removal** using IQR method
+- **Feature scaling**: StandardScaler + MinMaxScaler (model-dependent)
+- **Train/Test split**: 80/20 stratified split with fixed random seed for reproducibility
+- **Cross-validation setup**: 10-fold CV for robust evaluation
+
+#### [NEW] [src/feature_engineering.py](file:///d:/EcoToxAI/src/feature_engineering.py)
+- **Polynomial features** (degree 2) for capturing non-linear interactions
+- **Feature interaction terms** between key descriptors
+- **Feature selection** using mutual information and correlation analysis
+
+---
+
+### Phase 3 — Multi-Algorithm Training (The Core)
+
+We will train **7 algorithms** plus a **consensus ensemble**, each with hyperparameter tuning via GridSearchCV/RandomizedSearchCV:
+
+#### [NEW] [src/algorithms/regression/linear_regression_models.py](file:///d:/EcoToxAI/src/algorithms/regression/linear_regression_models.py)
+
+| Model | Hyperparameters Tuned | Why Include It |
+|---|---|---|
+| **Ridge Regression** | alpha (regularization strength) | Baseline — simple, fast, interpretable |
+| **Lasso Regression** | alpha | Feature selection via L1 regularization |
+| **ElasticNet** | alpha, l1_ratio | Combines L1 + L2 for balanced regularization |
+
+#### [NEW] [src/algorithms/regression/tree_based_regression_models.py](file:///d:/EcoToxAI/src/algorithms/regression/tree_based_regression_models.py)
+
+| Model | Hyperparameters Tuned | Why Include It |
+|---|---|---|
+| **Random Forest** | n_estimators, max_depth, min_samples_split, min_samples_leaf, max_features | Robust, handles non-linearity, resistant to overfitting |
+| **Gradient Boosting** | n_estimators, max_depth, learning_rate, subsample | Strong sequential learner |
+| **XGBoost** | n_estimators, max_depth, learning_rate, subsample, colsample_bytree, reg_alpha, reg_lambda | State-of-the-art for tabular data, best accuracy-speed tradeoff |
+
+#### [NEW] [src/algorithms/regression/support_vector_regression.py](file:///d:/EcoToxAI/src/algorithms/regression/support_vector_regression.py)
+
+| Model | Hyperparameters Tuned | Why Include It |
+|---|---|---|
+| **SVR (RBF kernel)** | C, gamma, epsilon | Excellent for small datasets, captures complex boundaries |
+
+#### [NEW] [src/algorithms/regression/knn_regression.py](file:///d:/EcoToxAI/src/algorithms/regression/knn_regression.py)
+
+| Model | Hyperparameters Tuned | Why Include It |
+|---|---|---|
+| **KNN Regressor** | n_neighbors, weights, metric | Instance-based learning, good for local patterns |
+
+#### [NEW] [src/algorithms/regression/neural_network_regression.py](file:///d:/EcoToxAI/src/algorithms/regression/neural_network_regression.py)
+
+| Model | Architecture | Why Include It |
+|---|---|---|
+| **Deep MLP** | Input(6) → Dense(128,ReLU) → Dropout(0.3) → Dense(64,ReLU) → Dropout(0.2) → Dense(32,ReLU) → Dense(1) | Learns complex non-linear patterns, state-of-the-art potential |
+
+- **Optimizer**: Adam with learning rate scheduling
+- **Early stopping**: Patience=20, restore best weights
+- **Batch normalization** between layers
+- **Training**: 500 epochs max with early stopping
+
+#### [NEW] [src/algorithms/regression/ensemble_regression.py](file:///d:/EcoToxAI/src/algorithms/regression/ensemble_regression.py)
+
+| Model | Method | Why Include It |
+|---|---|---|
+| **Stacking Ensemble** | Top 3 models as base learners → Ridge as meta-learner | Consensus of best models always outperforms individuals |
+| **Voting Ensemble** | Average predictions of top 3 models | Simpler consensus, often equally effective |
+
+---
+
+### Phase 4 — Evaluation & Comparison
+
+#### [NEW] [src/evaluation.py](file:///d:/EcoToxAI/src/evaluation.py)
+
+**Metrics computed for each model:**
+
+| Metric | What It Measures |
+|---|---|
+| **R² Score** | How much variance is explained (closer to 1 = better) |
+| **RMSE** | Root Mean Squared Error (lower = better) |
+| **MAE** | Mean Absolute Error (lower = better) |
+| **MAPE** | Mean Absolute Percentage Error |
+| **10-Fold CV R²** | Cross-validated R² for robustness |
+
+**Outputs generated:**
+- Model comparison bar chart (R², RMSE, MAE side by side)
+- Predicted vs. Actual scatter plot for each model
+- Residual distribution plots
+- Learning curves (train vs. validation error)
+- CSV report with all metrics for all models
+
+#### [NEW] [src/explainability.py](file:///d:/EcoToxAI/src/explainability.py)
+- **SHAP values** for tree-based models (which descriptors drive toxicity?)
+- **Feature importance** rankings from Random Forest and XGBoost
+- **Permutation importance** for model-agnostic feature ranking
+
+---
+
+### Phase 5 — Master Training Script
+
+#### [NEW] [train.py](file:///d:/EcoToxAI/train.py)
+Single entry point that:
+1. Loads and preprocesses data
+2. Trains all 7 models with hyperparameter tuning
+3. Evaluates all models with 10-fold CV
+4. Builds ensemble from top 3 performers
+5. Generates comparison plots and reports
+6. Saves the best model + ensemble to `outputs/models/`
+7. Prints a summary leaderboard to console
+
+```
+Usage: python train.py
+```
+
+---
+
+### Phase 6 — Prediction Pipeline
+
+#### [NEW] [src/predict.py](file:///d:/EcoToxAI/src/predict.py)
+- Load saved best model (or ensemble)
+- Accept new molecular descriptors as input
+- Return predicted LC50 value + confidence interval
+- Classify toxicity level:
+  - **Very High Toxicity**: LC50 < 1 mg/L
+  - **High Toxicity**: 1–10 mg/L
+  - **Moderate Toxicity**: 10–100 mg/L
+  - **Low Toxicity**: > 100 mg/L
+- (Following EPA GHS classification for aquatic acute toxicity)
+
+---
+
+### Phase 7 — Web Interface
+
+#### [NEW] [web/app.py](file:///d:/EcoToxAI/web/app.py)
+Flask application with routes:
+- `GET /` → Main prediction page
+- `POST /predict` → Accept descriptors, return prediction JSON
+- `GET /models` → Model comparison dashboard
+- `GET /api/predict` → REST API endpoint
+
+#### [NEW] [web/templates/index.html](file:///d:/EcoToxAI/web/templates/index.html)
+Premium dark-mode web interface featuring:
+- **Molecule input form** with 6 descriptor fields
+- **Animated prediction results** with toxicity gauge
+- **Color-coded safety rating** (green → red gradient)
+- **Model comparison dashboard** showing all algorithm performances
+- **Feature importance visualization**
+- **Glassmorphism cards** with subtle animations
+
+#### [NEW] [web/static/css/style.css](file:///d:/EcoToxAI/web/static/css/style.css)
+- Dark-mode color scheme with neon accents
+- Glassmorphism panels
+- Smooth micro-animations
+- Responsive grid layout
+- Google Fonts (Inter)
+
+#### [NEW] [web/static/js/app.js](file:///d:/EcoToxAI/web/static/js/app.js)
+- Async form submission
+- Animated toxicity gauge
+- Dynamic chart rendering (Chart.js)
+- Input validation
+
+---
+
+## Dataset Download Links
+
+### Primary Dataset (Required)
+
+| Dataset | Source | Records | Link |
+|---|---|---|---|
+| **QSAR Fish Toxicity** | UCI ML Repository | 908 chemicals, 6 descriptors + LC50 | [Download here](https://archive.ics.uci.edu/dataset/504/qsar+fish+toxicity) |
+
+### Optional — Additional Datasets for Future Expansion
+
+| Dataset | Source | Records | Link |
+|---|---|---|---|
+| **QSAR Aquatic Toxicity** (Daphnia) | UCI ML Repository | 546 chemicals, 8 descriptors + LC50 | [Download here](https://archive.ics.uci.edu/dataset/505/qsar+aquatic+toxicity) |
+| **EPA ECOTOX Knowledgebase** | U.S. EPA | 1M+ records (raw, needs filtering) | [Browse here](https://cfpub.epa.gov/ecotox/) |
+| **EPA T.E.S.T. Tool** | U.S. EPA | Pre-built toxicity databases | [Download here](https://www.epa.gov/chemical-research/toxicity-estimation-software-tool-test) |
+
+### How to Get the Data
+
+1. Go to **https://archive.ics.uci.edu/dataset/504/qsar+fish+toxicity**
+2. Click the **"Download"** button
+3. Extract the CSV file
+4. Place it as `d:\EcoToxAI\data\qsar_fish_toxicity.csv`
+
+> [!TIP]
+> Alternatively, we can download it programmatically using the `ucimlrepo` Python package during training — no manual download needed.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+```bash
+# Run the full training pipeline
+python train.py
+
+# Verify model performance metrics
+# Expected: Best model R² > 0.60, Ensemble R² > 0.65
+
+# Run the web server
+python web/app.py
+# Test predictions via browser at http://localhost:5000
+```
+
+### Manual Verification
+- Review model comparison charts in `outputs/plots/`
+- Verify predictions match expected toxicity ranges for known compounds
+- Test the web interface for usability and visual quality
+- Compare ensemble predictions against individual model predictions
+
+### Success Criteria
+| Metric | Minimum Target | Good Target |
+|---|---|---|
+| Best Single Model R² | > 0.55 | > 0.65 |
+| Ensemble R² | > 0.60 | > 0.70 |
+| RMSE | < 1.2 | < 0.9 |
+| Web UI Loads | ✅ | ✅ with animations |
