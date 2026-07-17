@@ -41,7 +41,6 @@ sys.path.insert(0, PROJECT_ROOT)
 
 from src.data_loader import load_data, print_data_summary, FEATURE_NAMES
 from src.preprocessing import preprocess_pipeline
-from src.feature_engineering import engineer_features
 from src.algorithms.regression.linear_regression_models import train_all_linear_models
 from src.algorithms.regression.tree_based_regression_models import train_all_tree_models
 from src.algorithms.regression.support_vector_regression import train_svr
