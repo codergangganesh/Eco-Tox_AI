@@ -112,9 +112,16 @@
                                         <stop offset="66%" style="stop-color:#FF6600" />
                                         <stop offset="100%" style="stop-color:#FF0000" />
                                     </linearGradient>
+                                    <!-- Neon radial glow gradient for needle base -->
+                                    <radialGradient id="needleRadialGlow" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                                        <stop offset="0%" stop-color="var(--gauge-glow-color, #6366f1)" stop-opacity="0.6" />
+                                        <stop offset="100%" stop-color="var(--gauge-glow-color, #6366f1)" stop-opacity="0" />
+                                    </radialGradient>
                                 </defs>
                                 <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="12" stroke-linecap="round"/>
                                 <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#gaugeGradient)" stroke-width="12" stroke-linecap="round" id="gauge-arc" stroke-dasharray="0 251.2"/>
+                                <!-- Radial glow behind needle base -->
+                                <circle cx="100" cy="100" r="28" fill="url(#needleRadialGlow)" id="gauge-needle-glow"/>
                                 <circle cx="100" cy="100" r="4" fill="white" id="gauge-needle-base"/>
                                 <line x1="100" y1="100" x2="100" y2="30" stroke="white" stroke-width="2" stroke-linecap="round" id="gauge-needle" transform="rotate(-90, 100, 100)"/>
                             </svg>
@@ -139,6 +146,14 @@
                             <span class="detail-value" id="detail-lc50">--</span>
                         </div>
                         <div class="detail-row">
+                            <span class="detail-label">Molar Concentration</span>
+                            <span class="detail-value" id="detail-molar">--</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Estimated Concentration</span>
+                            <span class="detail-value" id="detail-mgl">--</span>
+                        </div>
+                        <div class="detail-row">
                             <span class="detail-label">Toxicity Class</span>
                             <span class="detail-value" id="detail-class">--</span>
                         </div>
@@ -147,32 +162,232 @@
                             <span class="detail-value" id="detail-model">{{ model_info.get('best_model_name', 'N/A') }}</span>
                         </div>
                     </div>
+
+                    <!-- Benchmark Timeline -->
+                    <div class="benchmark-timeline-container" id="benchmark-timeline-container" style="display:none;">
+                        <h4 class="timeline-title">📍 Relative Toxicity Comparison</h4>
+                        <p class="timeline-desc">Compare the predicted toxicity against well-known chemical substances.</p>
+                        <div class="benchmark-timeline">
+                            <div class="timeline-line"></div>
+                            
+                            <div class="timeline-item" id="bm-rotenone">
+                                <span class="bm-dot danger"></span>
+                                <div class="bm-info">
+                                    <span class="bm-name">Rotenone (Insecticide)</span>
+                                    <span class="bm-value">6.80 pLC50 (Extremely Toxic)</span>
+                                </div>
+                            </div>
+                            
+                            <div class="timeline-item user-prediction-item" id="bm-user-prediction" style="display: none;">
+                                <span class="bm-dot user-dot"></span>
+                                <div class="bm-info user-info">
+                                    <span class="bm-name">PREDICTED COMPOUND</span>
+                                    <span class="bm-value" id="bm-user-value">--</span>
+                                </div>
+                            </div>
+                            
+                            <div class="timeline-item" id="bm-malathion">
+                                <span class="bm-dot warning"></span>
+                                <div class="bm-info">
+                                    <span class="bm-name">Malathion (Pesticide)</span>
+                                    <span class="bm-value">5.50 pLC50 (Highly Toxic)</span>
+                                </div>
+                            </div>
+                            
+                            <div class="timeline-item" id="bm-phenol">
+                                <span class="bm-dot alert"></span>
+                                <div class="bm-info">
+                                    <span class="bm-name">Phenol (Disinfectant)</span>
+                                    <span class="bm-value">3.50 pLC50 (Moderately Toxic)</span>
+                                </div>
+                            </div>
+                            
+                            <div class="timeline-item" id="bm-acetone">
+                                <span class="bm-dot success"></span>
+                                <div class="bm-info">
+                                    <span class="bm-name">Acetone (Solvent)</span>
+                                    <span class="bm-value">1.20 pLC50 (Low Toxic)</span>
+                                </div>
+                            </div>
+                            
+                            <div class="timeline-item" id="bm-ethanol">
+                                <span class="bm-dot safe"></span>
+                                <div class="bm-info">
+                                    <span class="bm-name">Ethanol (Alcohol)</span>
+                                    <span class="bm-value">0.30 pLC50 (Very Low Toxic)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actionable Guidance Card -->
+                    <div class="guidance-card-container" id="guidance-card-container" style="display:none;">
+                        <div class="guidance-card">
+                            <div class="guidance-header">
+                                <span class="guidance-icon" id="guidance-icon">💡</span>
+                                <span class="guidance-title">Eco-Hazard & Guidance</span>
+                            </div>
+                            <p class="guidance-text" id="guidance-text">--</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Toxicity Scale Reference -->
-            <div class="glass-card scale-card">
-                <h3 class="card-title">📊 Toxicity Classification Scale</h3>
-                <div class="scale-bar">
-                    <div class="scale-segment safe">
-                        <span class="scale-label">✅ Low</span>
-                        <span class="scale-range">&lt; 3.0</span>
+            <div class="glass-card scale-card" id="toxicity-scale-reference">
+                <div class="scale-card-header">
+                    <h3 class="card-title" style="border-bottom: none; margin-bottom: 8px; padding-bottom: 0;">📊 Toxicity Classification Reference</h3>
+                    <p class="scale-subtitle">Aquatic acute toxicity threshold scale based on GHS and EPA criteria for fish LC50 predictions.</p>
+                </div>
+
+                <!-- Continuous Gradient Slider Track -->
+                <div class="toxicity-track-wrapper">
+                    <div class="track-labels">
+                        <span>0.0</span>
+                        <span>1.0</span>
+                        <span>2.0</span>
+                        <span class="transition-mark">3.0</span>
+                        <span>4.0</span>
+                        <span class="transition-mark">4.5</span>
+                        <span>5.0</span>
+                        <span class="transition-mark">6.0</span>
+                        <span>7.0</span>
+                        <span>8.0+</span>
                     </div>
-                    <div class="scale-segment moderate">
-                        <span class="scale-label">⚡ Moderate</span>
-                        <span class="scale-range">3.0 – 4.5</span>
+                    <div class="toxicity-slider-bar">
+                        <div class="slider-segment low-seg"></div>
+                        <div class="slider-segment mod-seg"></div>
+                        <div class="slider-segment high-seg"></div>
+                        <div class="slider-segment vhigh-seg"></div>
+                        <div class="toxicity-track-pin" id="scale-pin" style="left: 0%; display: none;">
+                            <div class="pin-bubble">--</div>
+                            <div class="pin-pointer"></div>
+                        </div>
                     </div>
-                    <div class="scale-segment high">
-                        <span class="scale-label">⚠️ High</span>
-                        <span class="scale-range">4.5 – 6.0</span>
+                    <div class="track-unit-label">Continuous -LOG(mol/L) scale</div>
+                </div>
+
+                <!-- Rich Descriptive Grid Cards -->
+                <div class="toxicity-scale-grid">
+                    <!-- Low Toxicity Card -->
+                    <div class="tox-card tox-card-low" id="card-low-tox">
+                        <div class="tox-card-glow-bg"></div>
+                        <div class="tox-card-content">
+                            <div class="tox-badge-row">
+                                <span class="tox-emoji">✅</span>
+                                <span class="tox-label-name">Low Toxicity</span>
+                                <span class="tox-range-badge">&lt; 3.0</span>
+                            </div>
+                            <div class="tox-card-divider"></div>
+                            <p class="tox-desc">Minimal aquatic hazard. Safe under typical exposure conditions.</p>
+                            <div class="tox-meta-specs">
+                                <div class="tox-spec-item">
+                                    <span class="spec-label">Molar Conc.</span>
+                                    <span class="spec-val">&gt; 1.0 mM</span>
+                                </div>
+                                <div class="tox-spec-item">
+                                    <span class="spec-label">Eco Hazard</span>
+                                    <span class="spec-val">Safe / Minimal Risk</span>
+                                </div>
+                                <div class="tox-spec-item">
+                                    <span class="spec-label">Examples</span>
+                                    <span class="spec-val">Alcohols, simple sugars</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="scale-segment very-high">
-                        <span class="scale-label">☠️ Very High</span>
-                        <span class="scale-range">&gt; 6.0</span>
+
+                    <!-- Moderate Toxicity Card -->
+                    <div class="tox-card tox-card-moderate" id="card-moderate-tox">
+                        <div class="tox-card-glow-bg"></div>
+                        <div class="tox-card-content">
+                            <div class="tox-badge-row">
+                                <span class="tox-emoji">⚡</span>
+                                <span class="tox-label-name">Moderate Toxicity</span>
+                                <span class="tox-range-badge">3.0 – 4.5</span>
+                            </div>
+                            <div class="tox-card-divider"></div>
+                            <p class="tox-desc">Mild chronic risk. Caution advised for continuous discharges.</p>
+                            <div class="tox-meta-specs">
+                                <div class="tox-spec-item">
+                                    <span class="spec-label">Molar Conc.</span>
+                                    <span class="spec-val">31.6 µM – 1.0 mM</span>
+                                </div>
+                                <div class="tox-spec-item">
+                                    <span class="spec-label">Eco Hazard</span>
+                                    <span class="spec-val">Caution / Monitoring</span>
+                                </div>
+                                <div class="tox-spec-item">
+                                    <span class="spec-label">Examples</span>
+                                    <span class="spec-val">Phenols, surfactants</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- High Toxicity Card -->
+                    <div class="tox-card tox-card-high" id="card-high-tox">
+                        <div class="tox-card-glow-bg"></div>
+                        <div class="tox-card-content">
+                            <div class="tox-badge-row">
+                                <span class="tox-emoji">⚠️</span>
+                                <span class="tox-label-name">High Toxicity</span>
+                                <span class="tox-range-badge">4.5 – 6.0</span>
+                            </div>
+                            <div class="tox-card-divider"></div>
+                            <p class="tox-desc">Significant hazard. Potently toxic and strictly regulated.</p>
+                            <div class="tox-meta-specs">
+                                <div class="tox-spec-item">
+                                    <span class="spec-label">Molar Conc.</span>
+                                    <span class="spec-val">1.0 µM – 31.6 µM</span>
+                                </div>
+                                <div class="tox-spec-item">
+                                    <span class="spec-label">Eco Hazard</span>
+                                    <span class="spec-val">High / Strict Control</span>
+                                </div>
+                                <div class="tox-spec-item">
+                                    <span class="spec-label">Examples</span>
+                                    <span class="spec-val">Heavy metals, pesticides</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Very High Toxicity Card -->
+                    <div class="tox-card tox-card-very-high" id="card-very-high-tox">
+                        <div class="tox-card-glow-bg"></div>
+                        <div class="tox-card-content">
+                            <div class="tox-badge-row">
+                                <span class="tox-emoji">☠️</span>
+                                <span class="tox-label-name">Very High Toxicity</span>
+                                <span class="tox-range-badge">&gt; 6.0</span>
+                            </div>
+                            <div class="tox-card-divider"></div>
+                            <p class="tox-desc">Extreme hazard. Severely lethal even at trace concentrations.</p>
+                            <div class="tox-meta-specs">
+                                <div class="tox-spec-item">
+                                    <span class="spec-label">Molar Conc.</span>
+                                    <span class="spec-val">&lt; 1.0 µM</span>
+                                </div>
+                                <div class="tox-spec-item">
+                                    <span class="spec-label">Eco Hazard</span>
+                                    <span class="spec-val">Severe Biohazard</span>
+                                </div>
+                                <div class="tox-spec-item">
+                                    <span class="spec-label">Examples</span>
+                                    <span class="spec-val">Organophosphates, pyrethroids</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <p class="scale-note">Values shown in -LOG(mol/L). Higher values indicate greater toxicity (lower actual concentration needed to be lethal).</p>
+
+                <div class="scale-footer-note">
+                    <span class="note-icon">💡</span>
+                    <span class="note-text">Values are expressed in -LOG(mol/L). Higher values correspond to a lower physical concentration required to reach the median lethal dose (LC50), representing greater overall toxicity.</span>
+                </div>
             </div>
+
         </div>
     </section>
 
@@ -449,68 +664,6 @@
         </div>
     </section>
 
-    <!-- About Section -->
-    <section id="about-legacy" class="section">
-        <div class="container">
-            <div class="section-header">
-                <h2 class="section-title">About EcotoxAI</h2>
-                <p class="section-desc">Understanding the science behind the predictions.</p>
-            </div>
-
-            <div class="about-grid">
-                <div class="glass-card about-card">
-                    <h3>The Problem</h3>
-                    <p>Traditional ecotoxicity testing requires culturing aquatic organisms for 48-96 hours per compound. Testing a single chemical can take weeks and cost thousands of dollars.</p>
-                </div>
-                <div class="glass-card about-card">
-                    <h3>Our Solution</h3>
-                    <p>EcotoxAI uses machine learning trained on 908+ known chemicals to predict the LC50 (lethal concentration) for new compounds in under a second.</p>
-                </div>
-                <div class="glass-card about-card">
-                    <h3>The Data</h3>
-                    <p>Trained on the UCI QSAR Fish Toxicity dataset — 96-hour LC50 measurements for fathead minnow (Pimephales promelas) with 6 molecular descriptors.</p>
-                </div>
-                <div class="glass-card about-card">
-                    <h3>The Models</h3>
-                    <p>9 algorithms compared: Ridge, Lasso, ElasticNet, Random Forest, Gradient Boosting, XGBoost, SVR, KNN, and Deep Neural Networks. The best model is selected automatically.</p>
-                </div>
-            </div>
-
-            <!-- Feature Descriptions -->
-            <div class="glass-card features-card">
-                <h3 class="card-title">📝 Molecular Descriptors Explained</h3>
-                <div class="features-grid">
-                    <div class="feature-item">
-                        <span class="feature-name">CIC0</span>
-                        <span class="feature-desc">Complementary Information Content — measures molecular complexity and information richness of the chemical graph.</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-name">SM1_Dz(Z)</span>
-                        <span class="feature-desc">Spectral Moment from Barysz matrix weighted by atomic number — captures electronic structure information.</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-name">GATS1i</span>
-                        <span class="feature-desc">Geary Autocorrelation lag 1 weighted by ionization potential — encodes how atomic properties distribute spatially.</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-name">NdsCH</span>
-                        <span class="feature-desc">Count of =CH- fragments — number of doubly-bonded CH groups in the molecule.</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-name">NdssC</span>
-                        <span class="feature-desc">Count of =C&lt; fragments — number of carbon atoms with two double bonds.</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="feature-name">MLOGP</span>
-                        <span class="feature-desc">Moriguchi LogP — lipophilicity measure indicating how easily a compound enters biological membranes. Key driver of aquatic toxicity.</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-
-
     <!-- Lightbox Modal -->
     <div class="lightbox-overlay" id="lightbox-overlay">
         <button class="lightbox-close" id="lightbox-close" aria-label="Close preview">&times;</button>
@@ -520,9 +673,12 @@
         </div>
     </div>
 
+    <script id="comparison-data" type="application/json">
+        {{ comparison_data | tojson | safe }}
+    </script>
     <script>
         // Pass comparison data to JS safely
-        window.comparisonData = {{ comparison_data | tojson | safe }};
+        window.comparisonData = JSON.parse(document.getElementById('comparison-data').textContent);
     </script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>

@@ -76,6 +76,80 @@ function initPredictionForm() {
         e.preventDefault();
         await handlePrediction();
     });
+
+    form.addEventListener('reset', () => {
+        const resultCard = document.getElementById('result-card');
+        const badge = document.getElementById('classification-badge');
+        const badgeText = document.getElementById('badge-text');
+        const badgeEmoji = document.getElementById('badge-emoji');
+        const helperText = document.getElementById('result-helper-text');
+        const resultDetails = document.getElementById('result-details');
+        const gaugeValue = document.getElementById('gauge-value');
+
+        if (badgeEmoji) badgeEmoji.textContent = '🔬';
+        if (badgeText) badgeText.textContent = 'Ready to check toxicity';
+        if (helperText) {
+            helperText.textContent = 'Enter the six molecular descriptors and click Predict Toxicity. Your LC50 value and toxicity class will appear here.';
+        }
+        if (resultDetails) resultDetails.style.display = 'none';
+        if (gaugeValue) gaugeValue.textContent = '--';
+
+        // Reset new detail metrics
+        const detailMolar = document.getElementById('detail-molar');
+        const detailMgl = document.getElementById('detail-mgl');
+        if (detailMolar) detailMolar.textContent = '--';
+        if (detailMgl) detailMgl.textContent = '--';
+
+        // Reset benchmark timeline
+        const timelineContainer = document.getElementById('benchmark-timeline-container');
+        const userPredictionItem = document.getElementById('bm-user-prediction');
+        if (timelineContainer) timelineContainer.style.display = 'none';
+        if (userPredictionItem) userPredictionItem.style.display = 'none';
+
+        // Reset guidance card
+        const guidanceContainer = document.getElementById('guidance-card-container');
+        const guidanceTextEl = document.getElementById('guidance-text');
+        if (guidanceContainer) guidanceContainer.style.display = 'none';
+        if (guidanceTextEl) guidanceTextEl.textContent = '--';
+
+        if (badge) {
+            badge.style.background = '';
+            badge.style.borderColor = '';
+        }
+
+        // Reset gauge visuals
+        const arc = document.getElementById('gauge-arc');
+        const needle = document.getElementById('gauge-needle');
+        if (arc) arc.setAttribute('stroke-dasharray', '0 251.2');
+        if (needle) needle.setAttribute('transform', 'rotate(-90, 100, 100)');
+
+        const gaugeContainer = document.querySelector('.gauge-container');
+        if (gaugeContainer) {
+            gaugeContainer.classList.remove('has-result');
+            gaugeContainer.style.removeProperty('--gauge-color');
+            gaugeContainer.style.removeProperty('--gauge-glow-color');
+        }
+
+        if (resultCard) {
+            resultCard.style.removeProperty('--gauge-color');
+            resultCard.style.removeProperty('--gauge-glow-color');
+        }
+
+        // Hide and reset pin on continuous scale
+        const scalePin = document.getElementById('scale-pin');
+        if (scalePin) {
+            scalePin.style.display = 'none';
+            scalePin.style.left = '0%';
+        }
+
+        // Remove highlights from toxicity cards
+        const grid = document.querySelector('.toxicity-scale-grid');
+        if (grid) {
+            grid.classList.remove('has-active');
+            grid.querySelectorAll('.tox-card').forEach(card => card.classList.remove('remove'));
+            grid.querySelectorAll('.tox-card').forEach(card => card.classList.remove('active'));
+        }
+    });
 }
 
 async function handlePrediction() {
@@ -141,6 +215,27 @@ function displayResult(data) {
     resultCard.offsetHeight; // Trigger reflow
     resultCard.style.animation = 'slideUp 0.5s ease forwards';
     
+    // Update dynamic gauge color variables matching toxicity classification
+    const toxicityColors = {
+        'Very High Toxicity': '#ef4444',
+        'High Toxicity': '#f97316',
+        'Moderate Toxicity': '#f59e0b',
+        'Low Toxicity': '#10b981'
+    };
+    const toxColor = toxicityColors[data.toxicity_classification] || '#10b981';
+    
+    const gaugeContainer = document.querySelector('.gauge-container');
+    if (gaugeContainer) {
+        gaugeContainer.style.setProperty('--gauge-color', toxColor);
+        gaugeContainer.style.setProperty('--gauge-glow-color', toxColor);
+        gaugeContainer.classList.add('has-result');
+    }
+
+    if (resultCard) {
+        resultCard.style.setProperty('--gauge-color', toxColor);
+        resultCard.style.setProperty('--gauge-glow-color', toxColor);
+    }
+
     // Animate gauge
     const prediction = data.predicted_lc50_neg_log_mol_L;
     animateGauge(prediction);
@@ -174,8 +269,106 @@ function displayResult(data) {
     
     // Update details
     detailLc50.textContent = `${prediction.toFixed(4)} [-LOG(mol/L)]`;
+    
+    const detailMolar = document.getElementById('detail-molar');
+    if (detailMolar) {
+        detailMolar.innerHTML = `${data.molar_lc50_formatted} <span style="color:var(--text-muted); font-size:12px; font-weight:normal;">(${data.molar_lc50_intuitive})</span>`;
+    }
+    
+    const detailMgl = document.getElementById('detail-mgl');
+    if (detailMgl) {
+        detailMgl.textContent = data.estimated_mgl_range;
+    }
+    
     detailClass.textContent = data.toxicity_classification;
     resultDetails.style.display = 'block';
+
+    // Update and position User Prediction on the benchmark timeline
+    const timelineContainer = document.getElementById('benchmark-timeline-container');
+    const userPredictionItem = document.getElementById('bm-user-prediction');
+    const userValueEl = document.getElementById('bm-user-value');
+    
+    if (timelineContainer && userPredictionItem && userValueEl) {
+        userValueEl.textContent = `${prediction.toFixed(4)} pLC50 (${data.toxicity_classification})`;
+        
+        // Remove from DOM to re-insert in sorted position
+        if (userPredictionItem.parentNode) {
+            userPredictionItem.parentNode.removeChild(userPredictionItem);
+        }
+        
+        // Milestones sorted descending by pLC50
+        const milestones = [
+            { id: 'bm-rotenone', val: 6.80 },
+            { id: 'bm-malathion', val: 5.50 },
+            { id: 'bm-phenol', val: 3.50 },
+            { id: 'bm-acetone', val: 1.20 },
+            { id: 'bm-ethanol', val: 0.30 }
+        ];
+        
+        const timelineEl = timelineContainer.querySelector('.benchmark-timeline');
+        if (timelineEl) {
+            let inserted = false;
+            for (let i = 0; i < milestones.length; i++) {
+                const ms = milestones[i];
+                const msEl = document.getElementById(ms.id);
+                if (prediction >= ms.val) {
+                    if (msEl) {
+                        msEl.parentNode.insertBefore(userPredictionItem, msEl);
+                        inserted = true;
+                        break;
+                    }
+                }
+            }
+            if (!inserted) {
+                const lastMsEl = document.getElementById(milestones[milestones.length - 1].id);
+                if (lastMsEl) {
+                    lastMsEl.parentNode.appendChild(userPredictionItem);
+                }
+            }
+            userPredictionItem.style.display = 'flex';
+            timelineContainer.style.display = 'block';
+        }
+    }
+
+    // Update guidance card
+    const guidanceContainer = document.getElementById('guidance-card-container');
+    const guidanceTextEl = document.getElementById('guidance-text');
+    if (guidanceContainer && guidanceTextEl) {
+        guidanceTextEl.textContent = data.eco_hazard_guidance;
+        guidanceContainer.style.display = 'block';
+    }
+
+    // Redesigned continuous scale pin positioning (linear mapping: 0 to 10 scale)
+    const percentage = Math.min(Math.max((prediction / 10.0) * 100, 0), 100);
+    const scalePin = document.getElementById('scale-pin');
+    if (scalePin) {
+        scalePin.style.display = 'flex';
+        scalePin.style.left = `${percentage}%`;
+        const pinBubble = scalePin.querySelector('.pin-bubble');
+        if (pinBubble) {
+            pinBubble.textContent = prediction.toFixed(2);
+        }
+    }
+    
+    // Redesigned grid cards active highlighting
+    const cardMap = {
+        'Low Toxicity': 'card-low-tox',
+        'Moderate Toxicity': 'card-moderate-tox',
+        'High Toxicity': 'card-high-tox',
+        'Very High Toxicity': 'card-very-high-tox'
+    };
+    const grid = document.querySelector('.toxicity-scale-grid');
+    if (grid) {
+        grid.querySelectorAll('.tox-card').forEach(card => card.classList.remove('active'));
+        const activeCardId = cardMap[data.toxicity_classification];
+        const activeCard = document.getElementById(activeCardId);
+        if (activeCard) {
+            grid.classList.add('has-active');
+            activeCard.classList.add('active');
+        } else {
+            grid.classList.remove('has-active');
+        }
+    }
 }
 
 function animateGauge(value) {

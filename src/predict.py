@@ -93,6 +93,51 @@ def load_model_info() -> dict:
     return {}
 
 
+def format_scientific_notation(val: float) -> str:
+    """Format a float into premium scientific notation with superscript exponents."""
+    if val >= 0.01:
+        return f"{val:.4f} mol/L"
+    s = f"{val:.2e}"
+    base, exp = s.split('e')
+    exp = int(exp)
+    superscripts = {
+        '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', 
+        '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'
+    }
+    exp_str = "".join(superscripts.get(c, c) for c in str(exp))
+    return f"{base} × 10{exp_str} mol/L"
+
+
+def get_intuitive_concentration(val: float) -> str:
+    """Convert molar concentration into a human-friendly mM, µM, or nM unit."""
+    if val >= 1e-3:
+        return f"{val * 1e3:.2f} mM (millimolar)"
+    elif val >= 1e-6:
+        return f"{val * 1e6:.2f} µM (micromolar)"
+    else:
+        return f"{val * 1e9:.2f} nM (nanomolar)"
+
+
+def get_estimated_mg_L_range(val: float) -> str:
+    """Estimate mg/L concentration range assuming standard organic contaminant MW of 100-300 g/mol."""
+    min_mg_L = val * 100 * 1000  # MW = 100 g/mol, in mg/L
+    max_mg_L = val * 300 * 1000  # MW = 300 g/mol, in mg/L
+    if min_mg_L >= 100:
+        return f"{min_mg_L:.1f} – {max_mg_L:.1f} mg/L (ppm)"
+    elif min_mg_L >= 0.1:
+        return f"{min_mg_L:.2f} – {max_mg_L:.2f} mg/L (ppm)"
+    else:
+        return f"{min_mg_L:.4f} – {max_mg_L:.4f} mg/L (ppm)"
+
+
+ECO_HAZARD_GUIDANCE = {
+    'Low Toxicity': "Practically non-toxic to aquatic life. Minimal regulatory restrictions. General environmental stewardship advised.",
+    'Moderate Toxicity': "Slightly to moderately toxic. Continuous discharge may pose chronic risk. Environmental monitoring recommended.",
+    'High Toxicity': "Highly toxic to aquatic organisms. Strictly regulated under EPA and GHS standards. Prevent release into storm drains or waterways.",
+    'Very High Toxicity': "Extremely lethal to fish. Severe biohazard. Subject to stringent international environmental controls. Immediate containment and treatment required."
+}
+
+
 def predict_single(descriptors: dict, model=None, scaler=None,
                    model_name: str = 'best_model') -> dict:
     """
@@ -132,11 +177,24 @@ def predict_single(descriptors: dict, model=None, scaler=None,
     # Classify toxicity
     classification = classify_toxicity(prediction)
     
+    # Derived human-understandable concentration metrics
+    # pLC50 = -log10(LC50_mol_L) => LC50_mol_L = 10^-pLC50
+    molar_lc50 = 10 ** (-prediction)
+    molar_formatted = format_scientific_notation(molar_lc50)
+    molar_intuitive = get_intuitive_concentration(molar_lc50)
+    estimated_mgl_range = get_estimated_mg_L_range(molar_lc50)
+    eco_guidance = ECO_HAZARD_GUIDANCE.get(classification['class'], ECO_HAZARD_GUIDANCE['Low Toxicity'])
+    
     result = {
         'predicted_lc50_neg_log_mol_L': round(prediction, 4),
         'toxicity_classification': classification['class'],
         'toxicity_emoji': classification['emoji'],
         'toxicity_color': classification['color'],
+        'molar_lc50_mol_L': molar_lc50,
+        'molar_lc50_formatted': molar_formatted,
+        'molar_lc50_intuitive': molar_intuitive,
+        'estimated_mgl_range': estimated_mgl_range,
+        'eco_hazard_guidance': eco_guidance,
         'input_descriptors': descriptors,
         'feature_order': FEATURE_NAMES,
     }
