@@ -468,8 +468,9 @@ body {
 
 /* ── Sections ── */
 .section {
-    padding: 60px 0;
+    padding: calc(var(--nav-height) + 40px) 0 60px;
     display: none;
+    scroll-margin-top: var(--nav-height);
 }
 
 .section.active-section {

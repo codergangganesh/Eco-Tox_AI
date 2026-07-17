@@ -39,20 +39,11 @@ document.addEventListener('DOMContentLoaded', () => {
 function initNavigation() {
     const navLinks = document.querySelectorAll('.nav-link[data-section]');
     const sections = document.querySelectorAll('.section');
-    const hero = document.querySelector('.hero');
-
-    function updateHeroVisibility(sectionId) {
-        if (!hero) return;
-        hero.classList.toggle('hero-hidden', sectionId !== 'predictor');
-    }
-
-    updateHeroVisibility('predictor');
     
     navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             const targetId = link.getAttribute('data-section');
-            updateHeroVisibility(targetId);
             
             // Update active states
             navLinks.forEach(l => l.classList.remove('active'));

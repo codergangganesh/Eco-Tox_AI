@@ -31,57 +31,7 @@
         </div>
     </nav>
 
-    <!-- Hero Section -->
-    <header class="hero">
-        <div class="hero-content">
-            <div class="predictor-visual" aria-hidden="true">
-                <div class="visual-orbit orbit-one"></div>
-                <div class="visual-orbit orbit-two"></div>
-                <div class="visual-card">
-                    <div class="visual-card-header">
-                        <span>QSAR</span>
-                        <span>AI</span>
-                    </div>
-                    <div class="visual-flask">
-                        <span class="flask-neck"></span>
-                        <span class="flask-body">
-                            <span class="flask-liquid"></span>
-                            <span class="flask-bubble bubble-one"></span>
-                            <span class="flask-bubble bubble-two"></span>
-                            <span class="flask-bubble bubble-three"></span>
-                        </span>
-                    </div>
-                    <div class="visual-metric">
-                        <strong>LC50</strong>
-                        <span>Toxicity Prediction</span>
-                    </div>
-                </div>
-            </div>
-            <h1 class="hero-title">
-                <span class="hero-icon">🧬</span>
-                Aquatic Toxicity
-                <span class="gradient-text">Prediction</span>
-            </h1>
-            <p class="hero-subtitle">
-                Predict the ecotoxicity of chemical compounds instantly using AI trained on 908+ chemicals.
-                <br>Replace weeks of wet-lab bioassays with seconds of computation.
-            </p>
-            <div class="hero-stats">
-                <div class="stat-card">
-                    <span class="stat-value">908+</span>
-                    <span class="stat-label">Chemicals Trained</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-value">9</span>
-                    <span class="stat-label">ML Algorithms</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-value">&lt;1s</span>
-                    <span class="stat-label">Prediction Time</span>
-                </div>
-            </div>
-        </div>
-    </header>
+
 
     <!-- Predictor Section -->
     <section id="predictor" class="section active-section">
@@ -559,14 +509,7 @@
         </div>
     </section>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <img src="{{ url_for('static', filename='images/ecotox-logo.png') }}" alt="EcotoxAI logo" class="footer-logo">
-            <p>🧪 EcotoxAI — Aquatic Toxicity Prediction Platform</p>
-            <p class="footer-sub">Built with scikit-learn, XGBoost, TensorFlow, and Flask | Dataset: UCI QSAR Fish Toxicity</p>
-        </div>
-    </footer>
+
 
     <!-- Lightbox Modal -->
     <div class="lightbox-overlay" id="lightbox-overlay">
