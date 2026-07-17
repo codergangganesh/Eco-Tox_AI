@@ -94,8 +94,8 @@ def main():
     
     print("\n")
     print("╔" + "═" * 58 + "╗")
-    print("║" + "  🧪 EcoTox-AI: Aquatic Toxicity Prediction Platform  ".center(58) + "║")
-    print("║" + "  Training Pipeline v1.0  ".center(58) + "║")
+    print("║" + "  🧪 EcotoxAI: Aquatic Toxicity Prediction Platform  ".center(58) + "║")
+    print("║" + "  Training Pipeline  ".center(58) + "║")
     print("╚" + "═" * 58 + "╝")
     print()
     

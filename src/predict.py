@@ -181,7 +181,7 @@ def format_prediction_report(result: dict) -> str:
     
     report = []
     report.append("=" * 50)
-    report.append("  EcoTox-AI — Toxicity Prediction")
+    report.append("  EcotoxAI — Toxicity Prediction")
     report.append("=" * 50)
     report.append(f"  Predicted LC50: {result['predicted_lc50_neg_log_mol_L']:.4f} [-LOG(mol/L)]")
     report.append(f"  Classification: {result['toxicity_emoji']} {result['toxicity_classification']}")

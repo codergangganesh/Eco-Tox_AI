@@ -1,5 +1,5 @@
 """
-EcoTox-AI: Ensemble Models
+EcotoxAI: Ensemble Models
 Stacking Ensemble and Voting Ensemble built from the top-performing
 individual models.
 """
@@ -11,8 +11,6 @@ from sklearn.model_selection import cross_val_score
 import logging
 
 logger = logging.getLogger(__name__)
-
-
 def select_top_models(all_results: list, top_n: int = 3) -> list:
     """
     Select the top N performing models based on CV R² score.

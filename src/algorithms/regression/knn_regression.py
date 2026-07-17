@@ -1,5 +1,5 @@
 """
-EcoTox-AI: K-Nearest Neighbors Regressor
+EcotoxAI: K-Nearest Neighbors Regressor
 KNN with hyperparameter tuning for distance-based predictions.
 """
 

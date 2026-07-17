@@ -170,7 +170,7 @@ def plot_model_comparison(comparison_df: pd.DataFrame):
     os.makedirs(PLOTS_DIR, exist_ok=True)
     
     fig, axes = plt.subplots(1, 3, figsize=(18, 6))
-    fig.suptitle('EcoTox-AI — Model Comparison', fontsize=16, fontweight='bold')
+    fig.suptitle('EcotoxAI — Model Comparison', fontsize=16, fontweight='bold')
     
     models = comparison_df['Model'].values
     colors = sns.color_palette('husl', len(models))
@@ -221,7 +221,7 @@ def plot_predicted_vs_actual(all_metrics: list, y_test):
     rows = (n_models + cols - 1) // cols
     
     fig, axes = plt.subplots(rows, cols, figsize=(6 * cols, 5 * rows))
-    fig.suptitle('EcoTox-AI — Predicted vs Actual LC50', fontsize=16, fontweight='bold')
+    fig.suptitle('EcotoxAI — Predicted vs Actual LC50', fontsize=16, fontweight='bold')
     
     if rows == 1:
         axes = axes.reshape(1, -1)
@@ -268,7 +268,7 @@ def plot_residuals(all_metrics: list, y_test):
     rows = (n_models + cols - 1) // cols
     
     fig, axes = plt.subplots(rows, cols, figsize=(6 * cols, 5 * rows))
-    fig.suptitle('EcoTox-AI — Residual Distributions', fontsize=16, fontweight='bold')
+    fig.suptitle('EcotoxAI — Residual Distributions', fontsize=16, fontweight='bold')
     
     if rows == 1:
         axes = axes.reshape(1, -1)
@@ -340,7 +340,7 @@ def plot_learning_curves(model, X_train, y_train, model_name: str, cv=None):
 def print_leaderboard(comparison_df: pd.DataFrame):
     """Print a formatted leaderboard to console."""
     print("\n" + "=" * 80)
-    print("  EcoTox-AI — MODEL LEADERBOARD")
+    print("  EcotoxAI — MODEL LEADERBOARD")
     print("=" * 80)
     print(f"  {'Rank':<5} {'Model':<25} {'R²':>8} {'RMSE':>8} {'MAE':>8} {'MAPE':>8}")
     print(f"  {'-'*5} {'-'*25} {'-'*8} {'-'*8} {'-'*8} {'-'*8}")

@@ -1,5 +1,5 @@
 """
-EcoTox-AI: Explainability Module
+EcotoxAI: Explainability Module
 SHAP values, feature importance rankings, and permutation importance
 to explain which molecular descriptors drive toxicity predictions.
 """

@@ -5,12 +5,6 @@ Supports both local CSV and automatic download via ucimlrepo.
 """
 
 import os
-import glob
-import json
-import zipfile
-import tempfile
-import urllib.request
-from urllib.parse import urlparse
 import pandas as pd
 import numpy as np
 import logging
@@ -18,8 +12,10 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Column names for the UCI QSAR Fish Toxicity dataset
-FEATURE_NAMES = ['CIC0', 'SM1_Dz_Z', 'GATS1i', 'NdsCH', 'NdssC', 'MLOGP']
+# Column names for the UCI QSAR datasets
+FISH_FEATURE_NAMES = ['CIC0', 'SM1_Dz_Z', 'GATS1i', 'NdsCH', 'NdssC', 'MLOGP']
+DAPHNIA_FEATURE_NAMES = ['TPSA_Tot', 'SAacc', 'H_050', 'MLOGP', 'RDCHI', 'GATS1p', 'nN', 'C_040']
+FEATURE_NAMES = FISH_FEATURE_NAMES  # For backward compatibility
 TARGET_NAME = 'LC50'
 ALL_COLUMNS = FEATURE_NAMES + [TARGET_NAME]
 
@@ -27,177 +23,58 @@ ALL_COLUMNS = FEATURE_NAMES + [TARGET_NAME]
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
 DEFAULT_DATA_PATH = os.path.join(DATA_DIR, 'qsar_fish_toxicity.csv')
-EXTERNAL_DATA_DIR = os.path.join(DATA_DIR, 'external')
-REMOTE_DATASET_LINKS_PATH = os.path.join(DATA_DIR, 'dataset_links.json')
 
 
-def load_from_csv(filepath: str = None) -> pd.DataFrame:
+def get_feature_names(dataset_type: str = 'fish') -> list:
+    """Return the list of feature names for the specified dataset type."""
+    if dataset_type == 'daphnia':
+        return DAPHNIA_FEATURE_NAMES
+    return FISH_FEATURE_NAMES
+
+
+def load_from_csv(filepath: str = None, dataset_type: str = 'fish') -> pd.DataFrame:
     """
-    Load the QSAR Fish Toxicity dataset from a local CSV file.
-    
-    The UCI dataset uses semicolons as delimiters and has no header row.
+    Load the dataset from a local CSV file.
     
     Args:
-        filepath: Path to the CSV file. Defaults to data/qsar_fish_toxicity.csv
+        filepath: Path to the CSV file. If None, uses default path for the dataset_type.
+        dataset_type: 'fish' or 'daphnia'
         
     Returns:
         pd.DataFrame with named columns
     """
     if filepath is None:
-        filepath = DEFAULT_DATA_PATH
+        if dataset_type == 'daphnia':
+            filepath = os.path.join(DATA_DIR, 'qsar_aquatic_toxicity.csv')
+        else:
+            filepath = DEFAULT_DATA_PATH
     
     if not os.path.exists(filepath):
         raise FileNotFoundError(
             f"Dataset not found at {filepath}. "
-            "Download from https://archive.ics.uci.edu/dataset/504/qsar+fish+toxicity "
-            "or use load_from_ucimlrepo() for automatic download."
+            f"Please run train.py to download it automatically."
         )
     
-    logger.info(f"Loading dataset from {filepath}")
+    logger.info(f"Loading {dataset_type} dataset from {filepath}")
     
-    # UCI dataset uses semicolons as separators and has no header
-    df = pd.read_csv(filepath, sep=';', header=None, names=ALL_COLUMNS)
+    features = get_feature_names(dataset_type)
+    all_cols = features + [TARGET_NAME]
     
-    logger.info(f"Loaded {len(df)} records with {len(FEATURE_NAMES)} features")
+    # UCI datasets use semicolons as separators and have no header
+    df = pd.read_csv(filepath, sep=';', header=None, names=all_cols)
+    
+    logger.info(f"Loaded {len(df)} records with {len(features)} features")
     return df
 
 
-def load_external_same_schema_data(directory: str = EXTERNAL_DATA_DIR) -> pd.DataFrame:
-    """
-    Load optional external training files that already match this model's schema.
-
-    This intentionally accepts only the six established descriptors plus LC50 so
-    the current model, scaler, prediction API, and web workflow remain unchanged.
-    Put CSV files in data/external/ with either headers matching ALL_COLUMNS or
-    no header in the same semicolon-delimited order as qsar_fish_toxicity.csv.
-    """
-    if not os.path.isdir(directory):
-        return pd.DataFrame(columns=ALL_COLUMNS)
-
-    frames = []
-    for path in sorted(glob.glob(os.path.join(directory, '*.csv'))):
-        logger.info(f"Loading optional external training data from {path}")
-        sample = pd.read_csv(path, nrows=1, sep=None, engine='python')
-        has_named_columns = set(ALL_COLUMNS).issubset(sample.columns)
-
-        if has_named_columns:
-            df = pd.read_csv(path, sep=None, engine='python')
-            df = df[ALL_COLUMNS]
-        else:
-            df = pd.read_csv(path, sep=';', header=None, names=ALL_COLUMNS)
-
-        frames.append(df)
-
-    if not frames:
-        return pd.DataFrame(columns=ALL_COLUMNS)
-
-    combined = pd.concat(frames, ignore_index=True)
-    logger.info(f"Loaded {len(combined)} optional external records")
-    return combined
-
-
-def _read_same_schema_csv(path: str) -> pd.DataFrame:
-    """Read a CSV that either has project headers or follows the UCI no-header order."""
-    sample = pd.read_csv(path, nrows=1, sep=None, engine='python')
-    has_named_columns = set(ALL_COLUMNS).issubset(sample.columns)
-
-    if has_named_columns:
-        df = pd.read_csv(path, sep=None, engine='python')
-        return df[ALL_COLUMNS]
-
-    return pd.read_csv(path, sep=';', header=None, names=ALL_COLUMNS)
-
-
-def _download_file(url: str, destination: str):
-    """Download a URL to a local destination using only the Python standard library."""
-    os.makedirs(os.path.dirname(destination), exist_ok=True)
-    request = urllib.request.Request(url, headers={'User-Agent': 'EcoTox-AI/1.0'})
-    with urllib.request.urlopen(request, timeout=60) as response:
-        with open(destination, 'wb') as out_file:
-            out_file.write(response.read())
-
-
-def _extract_csv_from_zip(zip_path: str, output_path: str):
-    """Extract the first CSV from a zip archive into output_path."""
-    with zipfile.ZipFile(zip_path) as archive:
-        csv_members = [name for name in archive.namelist() if name.lower().endswith('.csv')]
-        if not csv_members:
-            raise ValueError(f"No CSV file found in remote archive: {zip_path}")
-
-        with archive.open(csv_members[0]) as source, open(output_path, 'wb') as target:
-            target.write(source.read())
-
-
-def sync_remote_dataset_links(config_path: str = REMOTE_DATASET_LINKS_PATH,
-                              output_dir: str = EXTERNAL_DATA_DIR) -> list:
-    """
-    Download enabled remote CSV/ZIP dataset links into data/external/.
-
-    Only links declared as same_schema are accepted for training. This keeps the
-    model's feature contract unchanged while allowing training data to come from
-    URLs instead of manual uploads.
-    """
-    if not os.path.exists(config_path):
-        return []
-
-    with open(config_path, 'r', encoding='utf-8') as f:
-        sources = json.load(f)
-
-    downloaded = []
-    os.makedirs(output_dir, exist_ok=True)
-
-    for source in sources:
-        if not source.get('enabled', False):
-            continue
-        if not source.get('same_schema', False):
-            logger.warning(
-                "Skipping remote dataset '%s': it is not marked as same-schema.",
-                source.get('name', 'unnamed')
-            )
-            continue
-
-        name = source.get('name', 'remote_dataset')
-        url = source['url']
-        output_path = os.path.join(output_dir, f"{name}.csv")
-
-        if os.path.exists(output_path) and not source.get('refresh', False):
-            logger.info(f"Using cached remote dataset: {output_path}")
-            downloaded.append(output_path)
-            continue
-
-        logger.info(f"Downloading remote training dataset '{name}' from {url}")
-        parsed_path = urlparse(url).path.lower()
-
-        try:
-            if parsed_path.endswith('.zip'):
-                with tempfile.TemporaryDirectory() as tmp_dir:
-                    zip_path = os.path.join(tmp_dir, f"{name}.zip")
-                    _download_file(url, zip_path)
-                    _extract_csv_from_zip(zip_path, output_path)
-            elif parsed_path.endswith('.csv'):
-                _download_file(url, output_path)
-            else:
-                logger.warning(
-                    "Skipping remote dataset '%s': only direct CSV or ZIP links are supported.",
-                    name
-                )
-                continue
-
-            # Fail early if the downloaded file does not match the training schema.
-            _read_same_schema_csv(output_path)
-            downloaded.append(output_path)
-            logger.info(f"Remote dataset cached for training: {output_path}")
-        except Exception as exc:
-            logger.warning(f"Could not use remote dataset '{name}': {exc}")
-
-    return downloaded
-
-
-def load_from_ucimlrepo() -> pd.DataFrame:
+def load_from_ucimlrepo(dataset_type: str = 'fish') -> pd.DataFrame:
     """
     Download the dataset directly from UCI ML Repository using the ucimlrepo package.
     Also saves a local copy to data/ for future use.
     
+    Args:
+        dataset_type: 'fish' or 'daphnia'
+        ~
     Returns:
         pd.DataFrame with named columns
     """
@@ -208,93 +85,90 @@ def load_from_ucimlrepo() -> pd.DataFrame:
             "ucimlrepo package not installed. Run: pip install ucimlrepo"
         )
     
-    logger.info("Downloading QSAR Fish Toxicity dataset from UCI ML Repository...")
-    dataset = fetch_ucirepo(id=504)
+    if dataset_type == 'daphnia':
+        logger.info("Downloading QSAR Aquatic Toxicity dataset (Daphnia) from UCI ML Repository...")
+        dataset = fetch_ucirepo(id=505)
+        save_path = os.path.join(DATA_DIR, 'qsar_aquatic_toxicity.csv')
+    else:
+        logger.info("Downloading QSAR Fish Toxicity dataset from UCI ML Repository...")
+        dataset = fetch_ucirepo(id=504)
+        save_path = DEFAULT_DATA_PATH
     
     X = dataset.data.features
     y = dataset.data.targets
     
     # Combine features and target into a single DataFrame
     df = pd.concat([X, y], axis=1)
-    df.columns = ALL_COLUMNS
+    
+    features = get_feature_names(dataset_type)
+    all_cols = features + [TARGET_NAME]
+    df.columns = all_cols
     
     # Save locally for future use
     os.makedirs(DATA_DIR, exist_ok=True)
-    df.to_csv(DEFAULT_DATA_PATH, sep=';', header=False, index=False)
-    logger.info(f"Dataset saved locally to {DEFAULT_DATA_PATH}")
+    df.to_csv(save_path, sep=';', header=False, index=False)
+    logger.info(f"Dataset saved locally to {save_path}")
     
-    logger.info(f"Downloaded {len(df)} records with {len(FEATURE_NAMES)} features")
+    logger.info(f"Downloaded {len(df)} records with {len(features)} features")
     return df
 
 
-def load_data(filepath: str = None, auto_download: bool = True,
-              include_external: bool = True, sync_remote_links: bool = True) -> pd.DataFrame:
+def load_data(filepath: str = None, auto_download: bool = True, dataset_type: str = 'fish') -> pd.DataFrame:
     """
     Smart loader: tries local CSV first, falls back to UCI download.
     
     Args:
         filepath: Path to local CSV. If None, uses default path.
         auto_download: If True and local file missing, download from UCI.
-        include_external: If True, append compatible files from data/external/.
-        sync_remote_links: If True, download configured compatible URL sources first.
+        dataset_type: 'fish' or 'daphnia'
         
     Returns:
         Validated pd.DataFrame
     """
     try:
-        df = load_from_csv(filepath)
+        df = load_from_csv(filepath, dataset_type=dataset_type)
     except FileNotFoundError:
         if auto_download:
             logger.info("Local file not found. Attempting automatic download...")
-            df = load_from_ucimlrepo()
+            df = load_from_ucimlrepo(dataset_type=dataset_type)
         else:
             raise
     
-    if include_external:
-        if sync_remote_links:
-            sync_remote_dataset_links()
-
-        external_df = load_external_same_schema_data()
-        if not external_df.empty:
-            before = len(df)
-            df = pd.concat([df, external_df], ignore_index=True)
-            df = df.drop_duplicates().reset_index(drop=True)
-            logger.info(
-                "Combined base dataset with optional external data: "
-                f"{before} base + {len(external_df)} external -> {len(df)} unique records"
-            )
-
     # Validate the loaded data
-    df = validate_data(df)
+    df = validate_data(df, dataset_type=dataset_type)
     return df
 
 
-def validate_data(df: pd.DataFrame) -> pd.DataFrame:
+def validate_data(df: pd.DataFrame, dataset_type: str = 'fish') -> pd.DataFrame:
     """
     Validate dataset integrity: check for missing values, correct types,
     and reasonable value ranges.
     
     Args:
         df: Raw DataFrame
+        dataset_type: 'fish' or 'daphnia'
         
     Returns:
         Validated DataFrame (rows with issues may be dropped)
     """
-    logger.info("Validating dataset...")
+    logger.info(f"Validating {dataset_type} dataset...")
     initial_count = len(df)
     
+    features = get_feature_names(dataset_type)
+    all_cols = features + [TARGET_NAME]
+    
     # Check column count
-    if len(df.columns) != len(ALL_COLUMNS):
+    if len(df.columns) != len(all_cols):
         raise ValueError(
-            f"Expected {len(ALL_COLUMNS)} columns, got {len(df.columns)}. "
-            "Ensure the dataset is the UCI QSAR Fish Toxicity dataset."
+            f"Expected {len(all_cols)} columns, got {len(df.columns)}. "
+            f"Ensure the dataset is the correct QSAR dataset for {dataset_type}."
         )
     
     # Ensure column names
-    df.columns = ALL_COLUMNS
+    df.columns = all_cols
     
     # Convert all columns to numeric, coercing errors
-    for col in ALL_COLUMNS:
+    for col in all_cols:
         df[col] = pd.to_numeric(df[col], errors='coerce')
     
     # Drop rows with any missing values
@@ -319,20 +193,22 @@ def validate_data(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def get_data_summary(df: pd.DataFrame) -> dict:
+def get_data_summary(df: pd.DataFrame, dataset_type: str = 'fish') -> dict:
     """
     Generate a comprehensive summary of the dataset.
     
     Args:
         df: Validated DataFrame
+        dataset_type: 'fish' or 'daphnia'
         
     Returns:
         Dictionary containing summary statistics
     """
+    features = get_feature_names(dataset_type)
     summary = {
         'total_records': len(df),
-        'num_features': len(FEATURE_NAMES),
-        'feature_names': FEATURE_NAMES,
+        'num_features': len(features),
+        'feature_names': features,
         'target_name': TARGET_NAME,
         'target_stats': {
             'mean': float(df[TARGET_NAME].mean()),
@@ -344,7 +220,7 @@ def get_data_summary(df: pd.DataFrame) -> dict:
         'feature_stats': {}
     }
     
-    for feat in FEATURE_NAMES:
+    for feat in features:
         summary['feature_stats'][feat] = {
             'mean': float(df[feat].mean()),
             'std': float(df[feat].std()),
@@ -355,12 +231,13 @@ def get_data_summary(df: pd.DataFrame) -> dict:
     return summary
 
 
-def print_data_summary(df: pd.DataFrame):
+def print_data_summary(df: pd.DataFrame, dataset_type: str = 'fish'):
     """Print a formatted summary of the dataset to console."""
-    summary = get_data_summary(df)
+    summary = get_data_summary(df, dataset_type=dataset_type)
+    features = get_feature_names(dataset_type)
     
     print("\n" + "=" * 60)
-    print("  EcoTox-AI — Dataset Summary")
+    print(f"  EcotoxAI — {dataset_type.upper()} Dataset Summary")
     print("=" * 60)
     print(f"  Total records:  {summary['total_records']}")
     print(f"  Features:       {summary['num_features']}")
@@ -373,13 +250,16 @@ def print_data_summary(df: pd.DataFrame):
     print("  Feature Statistics:")
     print(f"  {'Feature':<12} {'Mean':>8} {'Std':>8} {'Min':>8} {'Max':>8}")
     print(f"  {'-'*12} {'-'*8} {'-'*8} {'-'*8} {'-'*8}")
-    for feat in FEATURE_NAMES:
+    for feat in features:
         stats = summary['feature_stats'][feat]
         print(f"  {feat:<12} {stats['mean']:>8.3f} {stats['std']:>8.3f} {stats['min']:>8.3f} {stats['max']:>8.3f}")
     print("=" * 60 + "\n")
 
 
 if __name__ == '__main__':
-    # Quick test: load and summarize
-    df = load_data()
-    print_data_summary(df)
+    # Quick test: load and summarize both
+    df_fish = load_data(dataset_type='fish')
+    print_data_summary(df_fish, dataset_type='fish')
+    
+    df_daphnia = load_data(dataset_type='daphnia')
+    print_data_summary(df_daphnia, dataset_type='daphnia')

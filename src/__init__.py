@@ -1,2 +1,2 @@
-# EcoTox-AI: Aquatic Toxicity Prediction Platform
+# EcotoxAI: Aquatic Toxicity Prediction Platform
 # Source package initialization

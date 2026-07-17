@@ -1,5 +1,5 @@
 """
-EcoTox-AI: Support Vector Regression Model
+EcotoxAI: Support Vector Regression Model
 SVR with RBF kernel and hyperparameter tuning.
 """
 

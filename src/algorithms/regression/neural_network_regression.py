@@ -1,5 +1,5 @@
 """
-EcoTox-AI: Deep Neural Network (MLP)
+EcotoxAI: Deep Neural Network (MLP)
 Multi-layer perceptron regressor using scikit-learn.
 """
 

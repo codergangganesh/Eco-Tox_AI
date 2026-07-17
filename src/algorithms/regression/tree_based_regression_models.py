@@ -1,5 +1,5 @@
 """
-EcoTox-AI: Tree-Based Models
+EcotoxAI: Tree-Based Models
 Random Forest, Gradient Boosting, and XGBoost with hyperparameter tuning.
 """
 

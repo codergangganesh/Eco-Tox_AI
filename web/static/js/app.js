@@ -1,30 +1,58 @@
 /**
- * EcoTox-AI — Frontend JavaScript
+ * EcotoxAI — Frontend JavaScript
  * Handles form submission, animated gauge, navigation,
- * and Chart.js model comparison visualization.
+ * Chart.js model comparison visualization, and DYNAMIC
+ * metrics loading from the /api/metrics endpoint.
  */
 
 // ══════════════════════════════════════════════
-// Navigation
+// Global state
+// ══════════════════════════════════════════════
+
+let comparisonChart = null;
+let plotsLoaded = false;
+
+// Timestamps of the last-known metrics files (for change detection)
+let _lastMetricsTimestamps = { csv: null, model_info: null };
+
+// Polling interval handle
+let _metricsPollingTimer = null;
+const METRICS_POLL_INTERVAL_MS = 30000; // 30 seconds
+
+// ══════════════════════════════════════════════
+// Bootstrap
 // ══════════════════════════════════════════════
 
 document.addEventListener('DOMContentLoaded', () => {
     initNavigation();
     initPredictionForm();
     initExampleButton();
-    initComparisonChart();
+    initDynamicMetrics();   // loads metrics + chart + starts polling
     initDynamicPlots();
     initLightbox();
 });
 
+// ══════════════════════════════════════════════
+// Navigation
+// ══════════════════════════════════════════════
+
 function initNavigation() {
     const navLinks = document.querySelectorAll('.nav-link[data-section]');
     const sections = document.querySelectorAll('.section');
+    const hero = document.querySelector('.hero');
+
+    function updateHeroVisibility(sectionId) {
+        if (!hero) return;
+        hero.classList.toggle('hero-hidden', sectionId !== 'predictor');
+    }
+
+    updateHeroVisibility('predictor');
     
     navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             const targetId = link.getAttribute('data-section');
+            updateHeroVisibility(targetId);
             
             // Update active states
             navLinks.forEach(l => l.classList.remove('active'));
@@ -36,7 +64,8 @@ function initNavigation() {
                 target.classList.add('active-section');
                 target.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 if (targetId === 'dashboard') {
-                    initComparisonChart();
+                    // Force a fresh metrics check when the user navigates to the dashboard
+                    refreshMetrics();
                     initDynamicPlots();
                 }
             }
@@ -64,11 +93,18 @@ async function handlePrediction() {
     const btnText = btn.querySelector('.btn-text');
     const btnLoader = btn.querySelector('.btn-loader');
     const resultCard = document.getElementById('result-card');
+    const badgeText = document.getElementById('badge-text');
+    const badgeEmoji = document.getElementById('badge-emoji');
+    const helperText = document.getElementById('result-helper-text');
     
     // Show loading state
     btnText.textContent = 'Predicting...';
     btnLoader.style.display = 'inline';
     btn.disabled = true;
+    if (resultCard) resultCard.style.display = 'block';
+    if (badgeEmoji) badgeEmoji.textContent = '...';
+    if (badgeText) badgeText.textContent = 'Checking toxicity...';
+    if (helperText) helperText.textContent = 'The model is analyzing the descriptors and preparing the LC50 prediction.';
     
     try {
         const formData = new FormData(form);
@@ -105,6 +141,7 @@ function displayResult(data) {
     const detailLc50 = document.getElementById('detail-lc50');
     const detailClass = document.getElementById('detail-class');
     const resultDetails = document.getElementById('result-details');
+    const helperText = document.getElementById('result-helper-text');
     const badge = document.getElementById('classification-badge');
     
     // Show result card with animation
@@ -123,6 +160,9 @@ function displayResult(data) {
     // Update classification badge
     badgeEmoji.textContent = data.toxicity_emoji;
     badgeText.textContent = data.toxicity_classification;
+    if (helperText) {
+        helperText.textContent = 'Toxicity check complete. Review the predicted LC50, class, and model details below.';
+    }
     
     // Color the badge based on toxicity
     const colorMap = {
@@ -194,10 +234,14 @@ function showError(message) {
     const badgeText = document.getElementById('badge-text');
     const badgeEmoji = document.getElementById('badge-emoji');
     const resultDetails = document.getElementById('result-details');
+    const helperText = document.getElementById('result-helper-text');
     
     resultCard.style.display = 'block';
     badgeEmoji.textContent = '❌';
     badgeText.textContent = message;
+    if (helperText) {
+        helperText.textContent = 'Please check the descriptor values and try again.';
+    }
     resultDetails.style.display = 'none';
     
     const badge = document.getElementById('classification-badge');
@@ -240,14 +284,222 @@ function initExampleButton() {
 }
 
 // ══════════════════════════════════════════════
+// Dynamic Metrics (Detailed Metrics + Chart)
+// ══════════════════════════════════════════════
+
+/**
+ * Initialise the dynamic metrics system:
+ *  1. Fetch latest metrics from /api/metrics
+ *  2. Populate the table & chart
+ *  3. Wire up the manual refresh button
+ *  4. Start the background polling timer
+ */
+function initDynamicMetrics() {
+    // Wire up the manual refresh button
+    const refreshBtn = document.getElementById('refresh-metrics-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => refreshMetrics());
+    }
+
+    // Initial load
+    refreshMetrics();
+
+    // Start background polling
+    startMetricsPolling();
+}
+
+/**
+ * Fetch the latest metrics from the server and update the UI.
+ * Optionally pass `force = true` to skip the timestamp check.
+ */
+async function refreshMetrics(force = true) {
+    const refreshBtn = document.getElementById('refresh-metrics-btn');
+
+    try {
+        if (!force) {
+            // Lightweight check: only fetch timestamps to see if anything changed
+            const checkResp = await fetch('/api/metrics/check');
+            if (!checkResp.ok) return;
+            const ts = await checkResp.json();
+            if (ts.csv === _lastMetricsTimestamps.csv &&
+                ts.model_info === _lastMetricsTimestamps.model_info) {
+                return; // nothing changed — skip the full fetch
+            }
+        }
+
+        // Spin the refresh icon
+        refreshBtn && refreshBtn.classList.add('spinning');
+
+        const response = await fetch('/api/metrics');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+
+        // Remember timestamps for next poll
+        _lastMetricsTimestamps = data.timestamps || {};
+
+        // Update global comparisonData for the chart
+        window.comparisonData = data.comparison || [];
+
+        // Toggle empty-state vs content
+        const emptyState = document.getElementById('dashboard-empty-state');
+        const chartWrapper = document.getElementById('chart-card-wrapper');
+        const metricsWrapper = document.getElementById('metrics-card-wrapper');
+
+        if (!data.has_data) {
+            if (emptyState) emptyState.style.display = '';
+            if (chartWrapper) chartWrapper.style.display = 'none';
+            if (metricsWrapper) metricsWrapper.style.display = 'none';
+            return;
+        }
+
+        if (emptyState) emptyState.style.display = 'none';
+        if (chartWrapper) chartWrapper.style.display = '';
+        if (metricsWrapper) metricsWrapper.style.display = '';
+
+        // Rebuild the table
+        buildMetricsTable(data.comparison);
+
+        // Rebuild the chart
+        buildComparisonChart(data.comparison);
+
+        // Update the "last updated" label
+        updateMetricsTimestamp(data.timestamps);
+
+        // Show a brief "updated" flash on the status bar
+        showMetricsStatusFlash('✅ Metrics synced with latest training run');
+
+    } catch (err) {
+        console.error('Failed to refresh metrics:', err);
+        showMetricsStatusFlash('⚠️ Could not load metrics — retrying…', true);
+    } finally {
+        refreshBtn && refreshBtn.classList.remove('spinning');
+    }
+}
+
+/**
+ * Build (or rebuild) the metrics table from an array of model objects.
+ */
+function buildMetricsTable(comparison) {
+    const tbody = document.getElementById('metrics-table-body');
+    if (!tbody) return;
+
+    if (!comparison || comparison.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" style="text-align:center; padding:2rem; color:var(--text-muted);">
+                    No metrics data available. Run <code>python train.py</code> to generate results.
+                </td>
+            </tr>`;
+        return;
+    }
+
+    // Dynamically detect all available column keys (beyond the standard ones)
+    const standardKeys = ['Model', 'R²', 'RMSE', 'MAE', 'MAPE (%)', 'CV R² (mean)', 'CV R² (std)'];
+
+    tbody.innerHTML = comparison.map((model, index) => {
+        const rank = index + 1;
+        const rankEmoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+        const topClass = rank <= 3 ? 'top-model' : '';
+
+        const r2 = formatMetric(model['R²'], 4);
+        const rmse = formatMetric(model['RMSE'], 4);
+        const mae = formatMetric(model['MAE'], 4);
+        const mape = formatMetric(model['MAPE (%)'], 1, '%');
+        const cvMean = formatMetric(model['CV R² (mean)'], 4);
+        const cvStd = formatMetric(model['CV R² (std)'], 4);
+
+        return `
+            <tr class="${topClass}" style="animation: fadeSlideIn 0.3s ease ${index * 0.04}s both;">
+                <td>${rankEmoji}</td>
+                <td class="model-name">${model.Model || 'N/A'}</td>
+                <td>${r2}</td>
+                <td>${rmse}</td>
+                <td>${mae}</td>
+                <td>${mape}</td>
+                <td>${cvMean}</td>
+                <td>${cvStd}</td>
+            </tr>`;
+    }).join('');
+}
+
+/**
+ * Format a metric value for display.
+ */
+function formatMetric(value, decimals, suffix = '') {
+    if (value === undefined || value === null || value === '') return '—';
+    const num = Number(value);
+    if (isNaN(num)) return String(value);
+    return num.toFixed(decimals) + suffix;
+}
+
+/**
+ * Update the "last updated" timestamp near the refresh button.
+ */
+function updateMetricsTimestamp(timestamps) {
+    const el = document.getElementById('metrics-last-updated');
+    if (!el) return;
+
+    const csvTs = timestamps && timestamps.csv;
+    if (csvTs) {
+        const date = new Date(csvTs * 1000);
+        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        el.textContent = `Last trained: ${dateStr} ${timeStr}`;
+        el.title = date.toISOString();
+    } else {
+        el.textContent = '';
+    }
+}
+
+/**
+ * Show a brief status flash in the metrics card.
+ */
+function showMetricsStatusFlash(message, isError = false) {
+    const bar = document.getElementById('metrics-status-bar');
+    if (!bar) return;
+
+    bar.textContent = message;
+    bar.className = isError ? 'metrics-status-bar error' : 'metrics-status-bar success';
+    bar.style.display = 'block';
+
+    // Auto-hide after 4 seconds
+    clearTimeout(bar._hideTimer);
+    bar._hideTimer = setTimeout(() => {
+        bar.style.display = 'none';
+    }, 4000);
+}
+
+/**
+ * Start polling the server for metrics changes every METRICS_POLL_INTERVAL_MS.
+ * Uses the lightweight /api/metrics/check endpoint first to avoid
+ * unnecessary heavy fetches.
+ */
+function startMetricsPolling() {
+    if (_metricsPollingTimer) clearInterval(_metricsPollingTimer);
+    _metricsPollingTimer = setInterval(() => {
+        refreshMetrics(false);  // false = check timestamps first
+    }, METRICS_POLL_INTERVAL_MS);
+}
+
+// ══════════════════════════════════════════════
 // Model Comparison Chart
 // ══════════════════════════════════════════════
 
-let comparisonChart = null;
-
+/**
+ * Legacy wrapper preserved for any callers that used the old name.
+ */
 function initComparisonChart() {
+    if (window.comparisonData && window.comparisonData.length > 0) {
+        buildComparisonChart(window.comparisonData);
+    }
+}
+
+/**
+ * Build (or rebuild) the Chart.js bar chart from comparison data.
+ */
+function buildComparisonChart(comparisonData) {
     const canvas = document.getElementById('comparison-chart');
-    if (!canvas || !window.comparisonData || comparisonData.length === 0) return;
+    if (!canvas || !comparisonData || comparisonData.length === 0) return;
     
     if (comparisonChart) {
         comparisonChart.destroy();
@@ -259,17 +511,6 @@ function initComparisonChart() {
     const r2Scores = comparisonData.map(m => m['R²'] || 0);
     const rmseScores = comparisonData.map(m => m.RMSE || 0);
     const maeScores = comparisonData.map(m => m.MAE || 0);
-    
-    // Generate colors
-    const colors = modelNames.map((_, i) => {
-        const hue = (i * 360 / modelNames.length + 220) % 360;
-        return `hsla(${hue}, 70%, 60%, 0.8)`;
-    });
-    
-    const borderColors = modelNames.map((_, i) => {
-        const hue = (i * 360 / modelNames.length + 220) % 360;
-        return `hsla(${hue}, 70%, 60%, 1)`;
-    });
     
     comparisonChart = new Chart(ctx, {
         type: 'bar',
@@ -355,8 +596,6 @@ function initComparisonChart() {
 // ══════════════════════════════════════════════
 // Dynamic Plot Gallery
 // ══════════════════════════════════════════════
-
-let plotsLoaded = false;
 
 function initDynamicPlots() {
     const grid = document.getElementById('dynamic-plots-grid');
@@ -495,7 +734,7 @@ function initLightbox() {
         }
     });
 
-    // Refresh button handler
+    // Refresh button handler (plots)
     const refreshBtn = document.getElementById('refresh-plots-btn');
     if (refreshBtn) {
         refreshBtn.addEventListener('click', () => {

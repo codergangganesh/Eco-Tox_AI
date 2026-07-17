@@ -1,5 +1,5 @@
 """
-EcoTox-AI: Linear Models
+EcotoxAI: Linear Models
 Ridge Regression, Lasso Regression, and ElasticNet with hyperparameter tuning.
 """
 

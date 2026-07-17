@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="EcoTox-AI: AI-powered aquatic toxicity prediction platform. Predict LC50 values instantly using machine learning trained on 908+ chemicals.">
-    <title>EcoTox-AI | Aquatic Toxicity Prediction</title>
+    <meta name="description" content="EcotoxAI: AI-powered aquatic toxicity prediction platform. Predict LC50 values instantly using machine learning trained on 908+ chemicals.">
+    <title>EcotoxAI | Aquatic Toxicity Prediction</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/ecotox-logo.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/ecotox-logo.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -18,9 +20,9 @@
     <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-brand">
+            <img src="{{ url_for('static', filename='images/ecotox-logo.png') }}" alt="EcotoxAI logo" class="nav-logo">
             <span class="nav-icon">🧪</span>
-            <span class="nav-title">EcoTox-AI</span>
-            <span class="nav-badge">v1.0</span>
+            <span class="nav-title">EcotoxAI</span>
         </div>
         <div class="nav-links">
             <a href="#predictor" class="nav-link active" data-section="predictor">Predictor</a>
@@ -32,6 +34,29 @@
     <!-- Hero Section -->
     <header class="hero">
         <div class="hero-content">
+            <div class="predictor-visual" aria-hidden="true">
+                <div class="visual-orbit orbit-one"></div>
+                <div class="visual-orbit orbit-two"></div>
+                <div class="visual-card">
+                    <div class="visual-card-header">
+                        <span>QSAR</span>
+                        <span>AI</span>
+                    </div>
+                    <div class="visual-flask">
+                        <span class="flask-neck"></span>
+                        <span class="flask-body">
+                            <span class="flask-liquid"></span>
+                            <span class="flask-bubble bubble-one"></span>
+                            <span class="flask-bubble bubble-two"></span>
+                            <span class="flask-bubble bubble-three"></span>
+                        </span>
+                    </div>
+                    <div class="visual-metric">
+                        <strong>LC50</strong>
+                        <span>Toxicity Prediction</span>
+                    </div>
+                </div>
+            </div>
             <h1 class="hero-title">
                 <span class="hero-icon">🧬</span>
                 Aquatic Toxicity
@@ -123,7 +148,7 @@
                 </div>
 
                 <!-- Results Panel -->
-                <div class="glass-card result-card" id="result-card" style="display:none;">
+                <div class="glass-card result-card" id="result-card">
                     <h3 class="card-title">Prediction Result</h3>
                     
                     <!-- Toxicity Gauge -->
@@ -151,8 +176,11 @@
                     <!-- Classification Badge -->
                     <div class="classification-badge" id="classification-badge">
                         <span class="badge-emoji" id="badge-emoji">🔬</span>
-                        <span class="badge-text" id="badge-text">Awaiting prediction...</span>
+                        <span class="badge-text" id="badge-text">Ready to check toxicity</span>
                     </div>
+                    <p class="result-helper-text" id="result-helper-text">
+                        Enter the six molecular descriptors and click Predict Toxicity. Your LC50 value and toxicity class will appear here.
+                    </p>
 
                     <!-- Details -->
                     <div class="result-details" id="result-details" style="display:none;">
@@ -206,19 +234,27 @@
                 <p class="section-desc">Compare performance across all trained machine learning algorithms.</p>
             </div>
 
-            {% if comparison_data %}
-            <!-- Model Comparison Chart -->
-            <div class="glass-card chart-card">
+            <!-- Model Comparison Chart (dynamic) -->
+            <div class="glass-card chart-card" id="chart-card-wrapper">
                 <h3 class="card-title">Model Performance Comparison</h3>
                 <div class="chart-container">
                     <canvas id="comparison-chart"></canvas>
                 </div>
             </div>
 
-            <!-- Model Table -->
-            <div class="glass-card table-card">
-                <h3 class="card-title">Detailed Metrics</h3>
-                <div class="table-wrapper">
+            <!-- Dynamic Detailed Metrics Section -->
+            <div class="glass-card table-card" id="metrics-card-wrapper">
+                <div class="metrics-card-header">
+                    <h3 class="card-title" style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">Detailed Metrics</h3>
+                    <div class="metrics-header-actions">
+                        <span class="metrics-last-updated" id="metrics-last-updated"></span>
+                        <button class="btn-refresh" id="refresh-metrics-btn" title="Refresh metrics">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="metrics-status-bar"></div>
+                <div class="table-wrapper" id="metrics-table-wrapper">
                     <table class="metrics-table" id="metrics-table">
                         <thead>
                             <tr>
@@ -228,21 +264,12 @@
                                 <th>RMSE</th>
                                 <th>MAE</th>
                                 <th>MAPE (%)</th>
+                                <th>CV R² (mean)</th>
+                                <th>CV R² (std)</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {% for model in comparison_data %}
-                            <tr class="{% if loop.index <= 3 %}top-model{% endif %}">
-                                <td>
-                                    {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}
-                                </td>
-                                <td class="model-name">{{ model.get('Model', 'N/A') }}</td>
-                                <td>{{ "%.4f"|format(model.get('R²', 0)) }}</td>
-                                <td>{{ "%.4f"|format(model.get('RMSE', 0)) }}</td>
-                                <td>{{ "%.4f"|format(model.get('MAE', 0)) }}</td>
-                                <td>{{ "%.1f"|format(model.get('MAPE (%)', 0)) }}%</td>
-                            </tr>
-                            {% endfor %}
+                        <tbody id="metrics-table-body">
+                            <!-- Populated dynamically by JS -->
                         </tbody>
                     </table>
                 </div>
@@ -267,42 +294,233 @@
                     <div class="plot-skeleton"><div class="skeleton-shimmer"></div></div>
                 </div>
             </div>
-            {% else %}
-            <div class="glass-card empty-state">
+
+            <!-- Empty state (shown/hidden by JS when no data) -->
+            <div class="glass-card empty-state" id="dashboard-empty-state" style="display:none;">
                 <span class="empty-icon">🚀</span>
                 <h3>No Model Data Yet</h3>
                 <p>Run <code>python train.py</code> to train models and see comparison results here.</p>
             </div>
-            {% endif %}
+        </div>
+    </section>
+
+    <!-- Expanded About Section -->
+    <section id="about" class="section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">About EcotoxAI</h2>
+                <p class="section-desc">A complete technical overview of the project, data, models, workflow, and outputs.</p>
+            </div>
+
+            <div class="about-hero glass-card">
+                <div class="about-hero-copy">
+                    <span class="about-kicker">{{ about.project.release_stage }}</span>
+                    <h3>{{ about.project.name }}: {{ about.project.purpose }}</h3>
+                    <p>EcotoxAI estimates aquatic toxicity from molecular descriptors by predicting LC50 in {{ about.dataset.target_unit }} for {{ about.dataset.organism }}. The application combines a Flask prediction interface, dynamic model analytics, explainability plots, and a repeatable training pipeline.</p>
+                </div>
+                <div class="about-version-card">
+                    <span class="about-version-label">Models Compared</span>
+                    <strong>{{ about.comparison_count }}</strong>
+                    <span>{{ about.plots|length }} visual outputs available</span>
+                </div>
+            </div>
+
+            <div class="about-nav-pills" aria-label="About page sections">
+                <a href="#about-overview">Overview</a>
+                <a href="#about-pipeline">Pipeline</a>
+                <a href="#about-models">Models</a>
+                <a href="#about-data">Dataset</a>
+                <a href="#about-architecture">Architecture</a>
+                <a href="#about-roadmap">Roadmap</a>
+            </div>
+
+            <div id="about-overview" class="about-grid">
+                <div class="glass-card about-card">
+                    <h3>Problem Statement</h3>
+                    <p>Experimental ecotoxicity testing can require controlled aquatic organisms, measured exposure windows, specialized labs, and repeated assays. That makes early screening slow and expensive when many compounds need prioritization.</p>
+                </div>
+                <div class="glass-card about-card">
+                    <h3>Project Purpose</h3>
+                    <p>The project provides a QSAR-based machine learning workflow that predicts acute aquatic toxicity from six molecular descriptors and helps users compare model reliability before interpreting predictions.</p>
+                </div>
+                <div class="glass-card about-card">
+                    <h3>Objectives</h3>
+                    <p>Load validated toxicity data, preprocess it consistently, train multiple regression families, select strong candidates, explain important descriptors, and expose the result through a responsive web dashboard.</p>
+                </div>
+                <div class="glass-card about-card">
+                    <h3>Core Capability</h3>
+                    <p>Users enter CIC0, SM1_Dz_Z, GATS1i, NdsCH, NdssC, and MLOGP values to receive an LC50 estimate, toxicity class, model identifier, and dashboard context for the current training run.</p>
+                </div>
+            </div>
+
+            <div class="about-stats-grid">
+                <div class="glass-card about-stat-card"><span>Raw dataset records</span><strong>{{ about.dataset.raw_records or 'N/A' }}</strong><small>{{ about.dataset.source_name }}</small></div>
+                <div class="glass-card about-stat-card"><span>Training samples</span><strong>{{ about.model_info.get('training_samples', 'N/A') }}</strong><small>After validation, outlier filtering, and split</small></div>
+                <div class="glass-card about-stat-card"><span>Test samples</span><strong>{{ about.model_info.get('test_samples', 'N/A') }}</strong><small>Held out for final evaluation</small></div>
+                <div class="glass-card about-stat-card"><span>Best model</span><strong>{{ about.model_info.get('best_model_name', about.best_row.get('Model', 'N/A')) }}</strong><small>Selected from saved training metadata</small></div>
+            </div>
+
+            <div id="about-pipeline" class="glass-card about-section-card">
+                <h3 class="card-title">Machine Learning Pipeline</h3>
+                <div class="pipeline-flow">
+                    <div class="pipeline-step"><span>1</span><strong>Data Collection</strong><p>Loads the local UCI QSAR fish toxicity CSV or downloads it automatically through the UCI repository helper when needed.</p></div>
+                    <div class="pipeline-step"><span>2</span><strong>Validation</strong><p>Applies the expected schema, converts values to numeric format, drops missing values, and removes invalid negative targets.</p></div>
+                    <div class="pipeline-step"><span>3</span><strong>Preprocessing</strong><p>Uses IQR outlier filtering, an 80/20 train-test split with random_state 42, and StandardScaler fitted on training features only.</p></div>
+                    <div class="pipeline-step"><span>4</span><strong>Model Training</strong><p>Trains linear, tree-based, kernel, neighbor, neural-network, stacking, and voting regression models with cross-validation.</p></div>
+                    <div class="pipeline-step"><span>5</span><strong>Evaluation</strong><p>Ranks models using R2, RMSE, MAE, MAPE, and cross-validation statistics, then exports the comparison CSV and plots.</p></div>
+                    <div class="pipeline-step"><span>6</span><strong>Prediction</strong><p>Saves the best estimator and scaler, then serves real-time LC50 predictions through the web app and REST API.</p></div>
+                </div>
+            </div>
+
+            <div id="about-models" class="about-two-column">
+                <div class="glass-card about-section-card">
+                    <h3 class="card-title">Models Used</h3>
+                    <div class="model-list">
+                        <div><strong>Ridge Regression</strong><p>Linear baseline with L2 regularization to stabilize coefficients when descriptors are correlated.</p></div>
+                        <div><strong>Lasso Regression</strong><p>Linear model with L1 regularization that can shrink weaker descriptor coefficients to zero.</p></div>
+                        <div><strong>ElasticNet</strong><p>Combines L1 and L2 penalties to balance sparsity and coefficient stability.</p></div>
+                        <div><strong>Random Forest</strong><p>Bagged decision-tree ensemble that captures nonlinear descriptor interactions and reports feature importance.</p></div>
+                        <div><strong>Gradient Boosting</strong><p>Sequential tree ensemble that fits residual patterns to improve predictive accuracy.</p></div>
+                        <div><strong>XGBoost</strong><p>Optimized gradient boosting model with regularization and efficient tree learning.</p></div>
+                        <div><strong>SVR (RBF)</strong><p>Kernel-based regressor for nonlinear relationships in small-to-medium descriptor datasets.</p></div>
+                        <div><strong>KNN Regressor</strong><p>Similarity-based model that predicts from nearby compounds in descriptor space.</p></div>
+                        <div><strong>Deep MLP</strong><p>Multi-layer perceptron regressor trained on scaled descriptors with early stopping behavior.</p></div>
+                        <div><strong>Stacking and Voting Ensembles</strong><p>Meta-model and averaging ensembles built from top individual models for stronger aggregate performance.</p></div>
+                    </div>
+                </div>
+
+                <div class="glass-card about-section-card">
+                    <h3 class="card-title">Performance Snapshot</h3>
+                    {% if comparison_data %}
+                    <div class="leaderboard-mini">
+                        {% for row in comparison_data[:5] %}
+                        <div class="leaderboard-row"><span>#{{ loop.index }}</span><strong>{{ row.get('Model', 'N/A') }}</strong><em>R2 {{ "%.3f"|format(row.get('RÂ²', row.get('R2', 0))|float) }}</em></div>
+                        {% endfor %}
+                    </div>
+                    <p class="about-note">The full dashboard table remains dynamic and refreshes from <code>outputs/results/model_comparison.csv</code>.</p>
+                    {% else %}
+                    <p class="about-note">No model comparison data is available yet. Run <code>python train.py</code> to generate metrics.</p>
+                    {% endif %}
+                    <div class="metric-definitions">
+                        <div><strong>R2 Score</strong><p>Explains how much target variance the model captures. Higher is better.</p></div>
+                        <div><strong>RMSE</strong><p>Root mean squared error; penalizes larger prediction errors. Lower is better.</p></div>
+                        <div><strong>MAE</strong><p>Mean absolute error; average absolute prediction miss in LC50 units.</p></div>
+                        <div><strong>MAPE</strong><p>Mean absolute percentage error for relative error interpretation.</p></div>
+                        <div><strong>CV R2</strong><p>Cross-validation mean and spread, used to estimate generalization stability.</p></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="about-data" class="glass-card features-card">
+                <h3 class="card-title">Molecular Descriptors and Dataset</h3>
+                <div class="dataset-summary">
+                    <div><strong>Dataset source</strong><p><a href="{{ about.dataset.source_url }}" target="_blank" rel="noopener">{{ about.dataset.source_name }}</a>, {{ about.dataset.exposure }} endpoint for {{ about.dataset.organism }}.</p></div>
+                    <div><strong>Schema</strong><p>{{ about.dataset.feature_count }} descriptor features plus target <code>{{ about.dataset.target_name }}</code> measured as {{ about.dataset.target_unit }}.</p></div>
+                    <div><strong>Preprocessing split</strong><p>{{ about.model_info.get('training_samples', 'N/A') }} training samples and {{ about.model_info.get('test_samples', 'N/A') }} test samples after validation and IQR outlier filtering.</p></div>
+                    <div><strong>Target range</strong><p>{% if about.dataset.target_stats %}{{ "%.3f"|format(about.dataset.target_stats.min) }} to {{ "%.3f"|format(about.dataset.target_stats.max) }} {{ about.dataset.target_unit }}{% else %}Available after the dataset file is present.{% endif %}</p></div>
+                </div>
+                <div class="features-grid">
+                    <div class="feature-item"><span class="feature-name">CIC0</span><span class="feature-desc">Complementary Information Content - measures molecular complexity and information richness of the chemical graph.</span></div>
+                    <div class="feature-item"><span class="feature-name">SM1_Dz(Z)</span><span class="feature-desc">Spectral Moment from Barysz matrix weighted by atomic number - captures electronic structure information.</span></div>
+                    <div class="feature-item"><span class="feature-name">GATS1i</span><span class="feature-desc">Geary Autocorrelation lag 1 weighted by ionization potential - encodes how atomic properties distribute spatially.</span></div>
+                    <div class="feature-item"><span class="feature-name">NdsCH</span><span class="feature-desc">Count of =CH- fragments - number of doubly-bonded CH groups in the molecule.</span></div>
+                    <div class="feature-item"><span class="feature-name">NdssC</span><span class="feature-desc">Count of =C&lt; fragments - number of carbon atoms with two double bonds.</span></div>
+                    <div class="feature-item"><span class="feature-name">MLOGP</span><span class="feature-desc">Moriguchi LogP - lipophilicity measure indicating how easily a compound enters biological membranes. Key driver of aquatic toxicity.</span></div>
+                </div>
+            </div>
+
+            <div id="about-architecture" class="about-two-column">
+                <div class="glass-card about-section-card">
+                    <h3 class="card-title">Project Architecture</h3>
+                    <div class="architecture-list">
+                        <div><strong>Training entry point</strong><span><code>train.py</code> orchestrates data loading, preprocessing, training, evaluation, explainability, and model persistence.</span></div>
+                        <div><strong>Data layer</strong><span><code>src/data_loader.py</code> validates UCI-style data and supports automatic download.</span></div>
+                        <div><strong>Preprocessing</strong><span><code>src/preprocessing.py</code> handles outlier removal, scaling, splitting, and scaler persistence.</span></div>
+                        <div><strong>Algorithms</strong><span><code>src/algorithms/regression/</code> contains model-family-specific training modules.</span></div>
+                        <div><strong>Evaluation</strong><span><code>src/evaluation.py</code> exports metrics, leaderboard data, and plots.</span></div>
+                        <div><strong>Explainability</strong><span><code>src/explainability.py</code> generates SHAP and feature-importance analyses.</span></div>
+                        <div><strong>Web interface</strong><span><code>web/app.py</code>, <code>index.html</code>, CSS, and JS provide predictions, dashboard analytics, and this About page.</span></div>
+                    </div>
+                </div>
+
+                <div class="glass-card about-section-card">
+                    <h3 class="card-title">Dashboard and Visual Outputs</h3>
+                    <div class="visualization-list">
+                        <div><strong>Model comparison</strong><p>Shows R2, RMSE, and MAE side by side so users can compare accuracy and error scale.</p></div>
+                        <div><strong>Predicted vs actual</strong><p>Displays how closely each model tracks measured LC50 values.</p></div>
+                        <div><strong>Residual distributions</strong><p>Highlights prediction bias and error spread.</p></div>
+                        <div><strong>Learning curves</strong><p>Compare training and validation score as training-set size increases.</p></div>
+                        <div><strong>Feature importance and SHAP</strong><p>Explain which descriptors drive toxicity predictions and how they influence output direction.</p></div>
+                    </div>
+                    <p class="about-note">{{ about.plots|length }} plot files are currently discovered from <code>outputs/plots</code>.</p>
+                </div>
+            </div>
+
+            <div class="about-two-column">
+                <div class="glass-card about-section-card">
+                    <h3 class="card-title">Technologies and Tools</h3>
+                    <div class="tech-grid">
+                        {% for name, version in about.packages.items() %}
+                        <div><span>{{ name }}</span><strong>{{ version }}</strong></div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div id="about-roadmap" class="glass-card about-section-card">
+                    <h3 class="card-title">Future Enhancements</h3>
+                    <ul class="about-list">
+                        <li>Add descriptor-generation support from SMILES/SDF so larger public datasets can be integrated directly.</li>
+                        <li>Enable additional organisms and trophic levels such as Daphnia and algae with separate model metadata.</li>
+                        <li>Add prediction confidence intervals and model uncertainty explanations.</li>
+                        <li>Persist historical training runs for release-to-release comparison.</li>
+                        <li>Add exportable reports for regulatory screening and compound prioritization workflows.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="glass-card about-section-card">
+                <h3 class="card-title">Credits, Acknowledgements, and References</h3>
+                <div class="credits-grid">
+                    <div><strong>Dataset</strong><p>UCI QSAR Fish Toxicity dataset and the original aquatic toxicity QSAR descriptor schema.</p></div>
+                    <div><strong>ML ecosystem</strong><p>Built with Flask, pandas, NumPy, scikit-learn, XGBoost, SHAP, Matplotlib, Seaborn, and Joblib.</p></div>
+                    <div><strong>Current references</strong><p>Additional candidate sources are documented in <code>data/DATASET_SOURCES.md</code>, including Zenodo acute aquatic toxicity data and EPA ECOTOX for future expansion.</p></div>
+                </div>
+                <details class="about-details">
+                    <summary>Release and file metadata</summary>
+                    <div class="details-grid">
+                        <span>Release</span><strong>{{ about.project.release_stage }}</strong>
+                        <span>Model count</span><strong>{{ about.model_info.get('total_models_trained', about.comparison_count) }}</strong>
+                        <span>Training time</span><strong>{{ about.model_info.get('training_time_seconds', 'N/A') }} seconds</strong>
+                        <span>Feature count</span><strong>{{ about.model_info.get('n_features', about.dataset.feature_count) }}</strong>
+                        <span>Local dataset file</span><strong><code>{{ about.dataset.local_file }}</code></strong>
+                    </div>
+                </details>
+            </div>
         </div>
     </section>
 
     <!-- About Section -->
-    <section id="about" class="section">
+    <section id="about-legacy" class="section">
         <div class="container">
             <div class="section-header">
-                <h2 class="section-title">🧬 About EcoTox-AI</h2>
+                <h2 class="section-title">About EcotoxAI</h2>
                 <p class="section-desc">Understanding the science behind the predictions.</p>
             </div>
 
             <div class="about-grid">
                 <div class="glass-card about-card">
-                    <span class="about-icon">🔬</span>
                     <h3>The Problem</h3>
                     <p>Traditional ecotoxicity testing requires culturing aquatic organisms for 48-96 hours per compound. Testing a single chemical can take weeks and cost thousands of dollars.</p>
                 </div>
                 <div class="glass-card about-card">
-                    <span class="about-icon">🤖</span>
                     <h3>Our Solution</h3>
-                    <p>EcoTox-AI uses machine learning trained on 908+ known chemicals to predict the LC50 (lethal concentration) for new compounds in under a second.</p>
+                    <p>EcotoxAI uses machine learning trained on 908+ known chemicals to predict the LC50 (lethal concentration) for new compounds in under a second.</p>
                 </div>
                 <div class="glass-card about-card">
-                    <span class="about-icon">📊</span>
                     <h3>The Data</h3>
                     <p>Trained on the UCI QSAR Fish Toxicity dataset — 96-hour LC50 measurements for fathead minnow (Pimephales promelas) with 6 molecular descriptors.</p>
                 </div>
                 <div class="glass-card about-card">
-                    <span class="about-icon">⚙️</span>
                     <h3>The Models</h3>
                     <p>9 algorithms compared: Ridge, Lasso, ElasticNet, Random Forest, Gradient Boosting, XGBoost, SVR, KNN, and Deep Neural Networks. The best model is selected automatically.</p>
                 </div>
@@ -344,7 +562,8 @@
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <p>🧪 EcoTox-AI — Aquatic Toxicity Prediction Platform</p>
+            <img src="{{ url_for('static', filename='images/ecotox-logo.png') }}" alt="EcotoxAI logo" class="footer-logo">
+            <p>🧪 EcotoxAI — Aquatic Toxicity Prediction Platform</p>
             <p class="footer-sub">Built with scikit-learn, XGBoost, TensorFlow, and Flask | Dataset: UCI QSAR Fish Toxicity</p>
         </div>
     </footer>

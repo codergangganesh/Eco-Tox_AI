@@ -1,4 +1,4 @@
-# Dataset Sources for Larger EcoTox-AI Training
+# Dataset Sources for Larger EcotoxAI Training
 
 The current production workflow uses the UCI QSAR Fish Toxicity dataset:
 908 compounds, six molecular descriptors, and 96-hour fathead minnow LC50 in

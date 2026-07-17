@@ -1,5 +1,5 @@
 """
-EcoTox-AI: Preprocessing Module
+EcotoxAI: Preprocessing Module
 Handles feature scaling, outlier removal, train/test splitting,
 and cross-validation setup.
 """
