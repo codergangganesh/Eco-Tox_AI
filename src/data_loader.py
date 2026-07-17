@@ -5,6 +5,12 @@ Supports both local CSV and automatic download via ucimlrepo.
 """
 
 import os
+import glob
+import json
+import zipfile
+import tempfile
+import urllib.request
+from urllib.parse import urlparse
 import pandas as pd
 import numpy as np
 import logging
@@ -21,6 +27,8 @@ ALL_COLUMNS = FEATURE_NAMES + [TARGET_NAME]
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
 DEFAULT_DATA_PATH = os.path.join(DATA_DIR, 'qsar_fish_toxicity.csv')
+EXTERNAL_DATA_DIR = os.path.join(DATA_DIR, 'external')
+REMOTE_DATASET_LINKS_PATH = os.path.join(DATA_DIR, 'dataset_links.json')
 
 
 def load_from_csv(filepath: str = None) -> pd.DataFrame:
@@ -52,6 +60,137 @@ def load_from_csv(filepath: str = None) -> pd.DataFrame:
     
     logger.info(f"Loaded {len(df)} records with {len(FEATURE_NAMES)} features")
     return df
+
+
+def load_external_same_schema_data(directory: str = EXTERNAL_DATA_DIR) -> pd.DataFrame:
+    """
+    Load optional external training files that already match this model's schema.
+
+    This intentionally accepts only the six established descriptors plus LC50 so
+    the current model, scaler, prediction API, and web workflow remain unchanged.
+    Put CSV files in data/external/ with either headers matching ALL_COLUMNS or
+    no header in the same semicolon-delimited order as qsar_fish_toxicity.csv.
+    """
+    if not os.path.isdir(directory):
+        return pd.DataFrame(columns=ALL_COLUMNS)
+
+    frames = []
+    for path in sorted(glob.glob(os.path.join(directory, '*.csv'))):
+        logger.info(f"Loading optional external training data from {path}")
+        sample = pd.read_csv(path, nrows=1, sep=None, engine='python')
+        has_named_columns = set(ALL_COLUMNS).issubset(sample.columns)
+
+        if has_named_columns:
+            df = pd.read_csv(path, sep=None, engine='python')
+            df = df[ALL_COLUMNS]
+        else:
+            df = pd.read_csv(path, sep=';', header=None, names=ALL_COLUMNS)
+
+        frames.append(df)
+
+    if not frames:
+        return pd.DataFrame(columns=ALL_COLUMNS)
+
+    combined = pd.concat(frames, ignore_index=True)
+    logger.info(f"Loaded {len(combined)} optional external records")
+    return combined
+
+
+def _read_same_schema_csv(path: str) -> pd.DataFrame:
+    """Read a CSV that either has project headers or follows the UCI no-header order."""
+    sample = pd.read_csv(path, nrows=1, sep=None, engine='python')
+    has_named_columns = set(ALL_COLUMNS).issubset(sample.columns)
+
+    if has_named_columns:
+        df = pd.read_csv(path, sep=None, engine='python')
+        return df[ALL_COLUMNS]
+
+    return pd.read_csv(path, sep=';', header=None, names=ALL_COLUMNS)
+
+
+def _download_file(url: str, destination: str):
+    """Download a URL to a local destination using only the Python standard library."""
+    os.makedirs(os.path.dirname(destination), exist_ok=True)
+    request = urllib.request.Request(url, headers={'User-Agent': 'EcoTox-AI/1.0'})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        with open(destination, 'wb') as out_file:
+            out_file.write(response.read())
+
+
+def _extract_csv_from_zip(zip_path: str, output_path: str):
+    """Extract the first CSV from a zip archive into output_path."""
+    with zipfile.ZipFile(zip_path) as archive:
+        csv_members = [name for name in archive.namelist() if name.lower().endswith('.csv')]
+        if not csv_members:
+            raise ValueError(f"No CSV file found in remote archive: {zip_path}")
+
+        with archive.open(csv_members[0]) as source, open(output_path, 'wb') as target:
+            target.write(source.read())
+
+
+def sync_remote_dataset_links(config_path: str = REMOTE_DATASET_LINKS_PATH,
+                              output_dir: str = EXTERNAL_DATA_DIR) -> list:
+    """
+    Download enabled remote CSV/ZIP dataset links into data/external/.
+
+    Only links declared as same_schema are accepted for training. This keeps the
+    model's feature contract unchanged while allowing training data to come from
+    URLs instead of manual uploads.
+    """
+    if not os.path.exists(config_path):
+        return []
+
+    with open(config_path, 'r', encoding='utf-8') as f:
+        sources = json.load(f)
+
+    downloaded = []
+    os.makedirs(output_dir, exist_ok=True)
+
+    for source in sources:
+        if not source.get('enabled', False):
+            continue
+        if not source.get('same_schema', False):
+            logger.warning(
+                "Skipping remote dataset '%s': it is not marked as same-schema.",
+                source.get('name', 'unnamed')
+            )
+            continue
+
+        name = source.get('name', 'remote_dataset')
+        url = source['url']
+        output_path = os.path.join(output_dir, f"{name}.csv")
+
+        if os.path.exists(output_path) and not source.get('refresh', False):
+            logger.info(f"Using cached remote dataset: {output_path}")
+            downloaded.append(output_path)
+            continue
+
+        logger.info(f"Downloading remote training dataset '{name}' from {url}")
+        parsed_path = urlparse(url).path.lower()
+
+        try:
+            if parsed_path.endswith('.zip'):
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    zip_path = os.path.join(tmp_dir, f"{name}.zip")
+                    _download_file(url, zip_path)
+                    _extract_csv_from_zip(zip_path, output_path)
+            elif parsed_path.endswith('.csv'):
+                _download_file(url, output_path)
+            else:
+                logger.warning(
+                    "Skipping remote dataset '%s': only direct CSV or ZIP links are supported.",
+                    name
+                )
+                continue
+
+            # Fail early if the downloaded file does not match the training schema.
+            _read_same_schema_csv(output_path)
+            downloaded.append(output_path)
+            logger.info(f"Remote dataset cached for training: {output_path}")
+        except Exception as exc:
+            logger.warning(f"Could not use remote dataset '{name}': {exc}")
+
+    return downloaded
 
 
 def load_from_ucimlrepo() -> pd.DataFrame:
@@ -88,13 +227,16 @@ def load_from_ucimlrepo() -> pd.DataFrame:
     return df
 
 
-def load_data(filepath: str = None, auto_download: bool = True) -> pd.DataFrame:
+def load_data(filepath: str = None, auto_download: bool = True,
+              include_external: bool = True, sync_remote_links: bool = True) -> pd.DataFrame:
     """
     Smart loader: tries local CSV first, falls back to UCI download.
     
     Args:
         filepath: Path to local CSV. If None, uses default path.
         auto_download: If True and local file missing, download from UCI.
+        include_external: If True, append compatible files from data/external/.
+        sync_remote_links: If True, download configured compatible URL sources first.
         
     Returns:
         Validated pd.DataFrame
@@ -108,6 +250,20 @@ def load_data(filepath: str = None, auto_download: bool = True) -> pd.DataFrame:
         else:
             raise
     
+    if include_external:
+        if sync_remote_links:
+            sync_remote_dataset_links()
+
+        external_df = load_external_same_schema_data()
+        if not external_df.empty:
+            before = len(df)
+            df = pd.concat([df, external_df], ignore_index=True)
+            df = df.drop_duplicates().reset_index(drop=True)
+            logger.info(
+                "Combined base dataset with optional external data: "
+                f"{before} base + {len(external_df)} external -> {len(df)} unique records"
+            )
+
     # Validate the loaded data
     df = validate_data(df)
     return df

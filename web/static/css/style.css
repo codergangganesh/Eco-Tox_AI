@@ -814,13 +814,344 @@ body {
     margin-top: 24px;
 }
 
+.plots-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 8px;
+}
+
+.plots-card-header code {
+    background: rgba(99, 102, 241, 0.15);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent-primary);
+}
+
 .plots-section-desc {
     font-size: 14px;
     color: var(--text-secondary);
-    margin-bottom: 24px;
-    margin-top: -12px;
+    margin-bottom: 0;
+    margin-top: 6px;
 }
 
+.plots-count {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.3px;
+}
+
+/* ── Refresh Button ── */
+.btn-refresh {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--border-radius-xs);
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition-smooth);
+    flex-shrink: 0;
+}
+
+.btn-refresh:hover {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+    transform: rotate(45deg);
+}
+
+.btn-refresh.spinning svg {
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* ── Dynamic Plots Grid ── */
+.dynamic-plots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 20px;
+}
+
+@media (max-width: 400px) {
+    .dynamic-plots-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── Dynamic Plot Item ── */
+.dyn-plot-item {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--border-radius-sm);
+    overflow: hidden;
+    transition: var(--transition-smooth);
+    animation: plotCardIn 0.5s ease both;
+}
+
+@keyframes plotCardIn {
+    from { opacity: 0; transform: translateY(20px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.dyn-plot-item:hover {
+    border-color: rgba(99, 102, 241, 0.35);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(99, 102, 241, 0.1);
+}
+
+.dyn-plot-img-container {
+    position: relative;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 10px;
+    cursor: pointer;
+    overflow: hidden;
+    min-height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dyn-plot-img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    display: block;
+}
+
+.dyn-plot-img-container:hover .dyn-plot-img {
+    transform: scale(1.03);
+}
+
+/* ── Zoom Hint Overlay ── */
+.plot-zoom-hint {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    color: var(--text-secondary);
+    font-size: 11px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.25s ease;
+    pointer-events: none;
+}
+
+.dyn-plot-img-container:hover .plot-zoom-hint {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* ── Plot Title ── */
+.dyn-plot-title {
+    padding: 14px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-top: 1px solid var(--glass-border);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Image Error State ── */
+.img-error-placeholder {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 40px 20px;
+}
+
+.img-error-placeholder .error-icon {
+    font-size: 32px;
+    opacity: 0.5;
+}
+
+.dyn-plot-img-container.img-error .img-error-placeholder {
+    display: flex;
+}
+
+.dyn-plot-img-container.img-error {
+    cursor: default;
+}
+
+.dyn-plot-img-container.img-error .plot-zoom-hint {
+    display: none;
+}
+
+/* ── Loading Skeleton ── */
+.plot-skeleton {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--border-radius-sm);
+    height: 280px;
+    overflow: hidden;
+    position: relative;
+}
+
+.skeleton-shimmer {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.03) 40%,
+        rgba(255, 255, 255, 0.06) 50%,
+        rgba(255, 255, 255, 0.03) 60%,
+        transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ── Empty / Error State for Plots ── */
+.plots-empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 24px;
+}
+
+.plots-empty-state .empty-icon {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 16px;
+}
+
+.plots-empty-state h4 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+.plots-empty-state p {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.plots-empty-state code {
+    background: rgba(99, 102, 241, 0.15);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--accent-primary);
+}
+
+.plots-error-state {
+    border: 1px dashed rgba(245, 158, 11, 0.3);
+    border-radius: var(--border-radius-sm);
+    background: rgba(245, 158, 11, 0.04);
+}
+
+/* ── Lightbox ── */
+.lightbox-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.lightbox-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.lightbox-content {
+    max-width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    transform: scale(0.92);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.lightbox-overlay.active .lightbox-content {
+    transform: scale(1);
+}
+
+.lightbox-img {
+    max-width: 90vw;
+    max-height: 80vh;
+    object-fit: contain;
+    border-radius: var(--border-radius-sm);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+.lightbox-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 8px 24px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 24px;
+    backdrop-filter: blur(8px);
+}
+
+.lightbox-close {
+    position: absolute;
+    top: 20px;
+    right: 24px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--text-primary);
+    font-size: 28px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition-smooth);
+    line-height: 1;
+    z-index: 1001;
+}
+
+.lightbox-close:hover {
+    background: rgba(239, 68, 68, 0.25);
+    border-color: rgba(239, 68, 68, 0.4);
+    transform: rotate(90deg);
+}
+
+/* ── Legacy plots-grid support (backward compat) ── */
 .plots-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -883,3 +1214,4 @@ body {
 .plot-img:hover {
     transform: scale(1.02);
 }
+

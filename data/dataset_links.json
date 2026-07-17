@@ -1,0 +1,18 @@
+[
+  {
+    "name": "uci_qsar_fish_toxicity",
+    "url": "https://archive.ics.uci.edu/static/public/504/qsar+fish+toxicity.zip",
+    "enabled": true,
+    "same_schema": true,
+    "refresh": false,
+    "notes": "Direct UCI archive for the existing six-descriptor fish LC50 dataset. It is cached from the link and deduplicated during training."
+  },
+  {
+    "name": "zenodo_acute_aquatic_toxicity_3680",
+    "url": "https://zenodo.org/records/3708082/files/MergedEndpoints.sdf?download=1",
+    "enabled": false,
+    "same_schema": false,
+    "refresh": false,
+    "notes": "High-quality larger source with SMILES/SDF and fish pLC50 values. Disabled until a descriptor-generation step converts it to CIC0, SM1_Dz_Z, GATS1i, NdsCH, NdssC, MLOGP, LC50."
+  }
+]

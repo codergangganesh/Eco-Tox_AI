@@ -13,6 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initPredictionForm();
     initExampleButton();
     initComparisonChart();
+    initDynamicPlots();
+    initLightbox();
 });
 
 function initNavigation() {
@@ -35,6 +37,7 @@ function initNavigation() {
                 target.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 if (targetId === 'dashboard') {
                     initComparisonChart();
+                    initDynamicPlots();
                 }
             }
         });
@@ -347,4 +350,157 @@ function initComparisonChart() {
             }
         }
     });
+}
+
+// ══════════════════════════════════════════════
+// Dynamic Plot Gallery
+// ══════════════════════════════════════════════
+
+let plotsLoaded = false;
+
+function initDynamicPlots() {
+    const grid = document.getElementById('dynamic-plots-grid');
+    if (!grid) return;
+
+    // Only auto-load once; manual refresh always reloads
+    if (plotsLoaded) return;
+    loadPlots();
+}
+
+async function loadPlots() {
+    const grid = document.getElementById('dynamic-plots-grid');
+    const countEl = document.getElementById('plots-count');
+    const refreshBtn = document.getElementById('refresh-plots-btn');
+    if (!grid) return;
+
+    // Show loading state
+    refreshBtn && refreshBtn.classList.add('spinning');
+    if (!plotsLoaded) {
+        grid.innerHTML = `
+            <div class="plot-skeleton"><div class="skeleton-shimmer"></div></div>
+            <div class="plot-skeleton"><div class="skeleton-shimmer"></div></div>
+            <div class="plot-skeleton"><div class="skeleton-shimmer"></div></div>
+        `;
+    }
+
+    try {
+        const response = await fetch('/api/plots');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+
+        if (!data.plots || data.plots.length === 0) {
+            grid.innerHTML = `
+                <div class="plots-empty-state">
+                    <span class="empty-icon">📊</span>
+                    <h4>No Plots Available</h4>
+                    <p>Run <code>python train.py</code> to generate training visualizations.</p>
+                </div>
+            `;
+            if (countEl) countEl.textContent = '';
+            plotsLoaded = true;
+            return;
+        }
+
+        // Update count badge
+        if (countEl) {
+            countEl.textContent = `${data.count} visualization${data.count !== 1 ? 's' : ''} found`;
+        }
+
+        // Cache-bust timestamp
+        const cacheBust = Date.now();
+
+        // Build plot cards
+        grid.innerHTML = data.plots.map((plot, index) => `
+            <div class="dyn-plot-item" style="animation-delay: ${index * 0.05}s">
+                <div class="dyn-plot-img-container" data-src="${plot.url}" data-title="${plot.title}">
+                    <img
+                        src="${plot.url}?t=${cacheBust}"
+                        alt="${plot.title}"
+                        class="dyn-plot-img"
+                        loading="lazy"
+                        onerror="this.parentElement.classList.add('img-error'); this.style.display='none';"
+                    >
+                    <div class="img-error-placeholder">
+                        <span class="error-icon">🖼️</span>
+                        <span>Image unavailable</span>
+                    </div>
+                    <div class="plot-zoom-hint">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                        Click to enlarge
+                    </div>
+                </div>
+                <div class="dyn-plot-title">${plot.title}</div>
+            </div>
+        `).join('');
+
+        plotsLoaded = true;
+
+    } catch (error) {
+        console.error('Failed to load plots:', error);
+        grid.innerHTML = `
+            <div class="plots-empty-state plots-error-state">
+                <span class="empty-icon">⚠️</span>
+                <h4>Failed to Load Plots</h4>
+                <p>Could not fetch plot data from the server. Please try refreshing.</p>
+            </div>
+        `;
+    } finally {
+        refreshBtn && refreshBtn.classList.remove('spinning');
+    }
+}
+
+// ══════════════════════════════════════════════
+// Lightbox
+// ══════════════════════════════════════════════
+
+function initLightbox() {
+    const overlay = document.getElementById('lightbox-overlay');
+    const lightboxImg = document.getElementById('lightbox-img');
+    const lightboxTitle = document.getElementById('lightbox-title');
+    const closeBtn = document.getElementById('lightbox-close');
+    const grid = document.getElementById('dynamic-plots-grid');
+    if (!overlay || !grid) return;
+
+    // Event delegation: click on any plot image container
+    grid.addEventListener('click', (e) => {
+        const container = e.target.closest('.dyn-plot-img-container');
+        if (!container || container.classList.contains('img-error')) return;
+
+        const src = container.dataset.src;
+        const title = container.dataset.title;
+        if (!src) return;
+
+        lightboxImg.src = src + '?t=' + Date.now();
+        lightboxImg.alt = title || '';
+        lightboxTitle.textContent = title || '';
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    });
+
+    // Close handlers
+    function closeLightbox() {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+        // Clear src after transition to free memory
+        setTimeout(() => { lightboxImg.src = ''; }, 300);
+    }
+
+    closeBtn.addEventListener('click', closeLightbox);
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeLightbox();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && overlay.classList.contains('active')) {
+            closeLightbox();
+        }
+    });
+
+    // Refresh button handler
+    const refreshBtn = document.getElementById('refresh-plots-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+            plotsLoaded = false;
+            loadPlots();
+        });
+    }
 }

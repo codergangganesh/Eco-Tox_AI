@@ -248,25 +248,23 @@
                 </div>
             </div>
 
-            <!-- Training & Evaluation Visualizations -->
+            <!-- Training & Evaluation Visualizations (Dynamic) -->
             <div class="glass-card plots-card">
-                <h3 class="card-title">🔬 Model Training Visualizations</h3>
-                <p class="plots-section-desc">These visual plots are generated dynamically during model training to diagnose model fitting, prediction error, and feature dependencies.</p>
-                <div class="plots-grid">
-                    <div class="plot-item">
-                        <h4>Predicted vs. Actual LC50</h4>
-                        <p class="plot-desc">Scatter plots displaying actual vs. predicted values for all models. A tighter alignment along the diagonal red line indicates higher accuracy.</p>
-                        <div class="plot-img-container">
-                            <img src="/outputs/plots/predicted_vs_actual.png" alt="Predicted vs Actual Scatter Plot" class="plot-img">
-                        </div>
+                <div class="plots-card-header">
+                    <div>
+                        <h3 class="card-title" style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">🔬 Model Training Visualizations</h3>
+                        <p class="plots-section-desc">Auto-discovered from <code>outputs/plots</code> — updates dynamically after each training run.</p>
                     </div>
-                    <div class="plot-item">
-                        <h4>Residual Error Distributions</h4>
-                        <p class="plot-desc">Histograms of residuals (actual - predicted values) for each model. Narrow distributions centered at 0 indicate low prediction bias and low variance.</p>
-                        <div class="plot-img-container">
-                            <img src="/outputs/plots/residuals.png" alt="Residuals Histogram" class="plot-img">
-                        </div>
-                    </div>
+                    <button class="btn-refresh" id="refresh-plots-btn" title="Refresh plots">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                    </button>
+                </div>
+                <div class="plots-count" id="plots-count"></div>
+                <div class="dynamic-plots-grid" id="dynamic-plots-grid">
+                    <!-- Loading skeleton -->
+                    <div class="plot-skeleton"><div class="skeleton-shimmer"></div></div>
+                    <div class="plot-skeleton"><div class="skeleton-shimmer"></div></div>
+                    <div class="plot-skeleton"><div class="skeleton-shimmer"></div></div>
                 </div>
             </div>
             {% else %}
@@ -350,6 +348,15 @@
             <p class="footer-sub">Built with scikit-learn, XGBoost, TensorFlow, and Flask | Dataset: UCI QSAR Fish Toxicity</p>
         </div>
     </footer>
+
+    <!-- Lightbox Modal -->
+    <div class="lightbox-overlay" id="lightbox-overlay">
+        <button class="lightbox-close" id="lightbox-close" aria-label="Close preview">&times;</button>
+        <div class="lightbox-content">
+            <img src="" alt="" id="lightbox-img" class="lightbox-img">
+            <div class="lightbox-title" id="lightbox-title"></div>
+        </div>
+    </div>
 
     <script>
         // Pass comparison data to JS safely

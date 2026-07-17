@@ -130,6 +130,31 @@ def models_dashboard():
     })
 
 
+@app.route('/api/plots')
+def api_plots():
+    """Return list of available plot images as JSON."""
+    plots_dir = os.path.join(PROJECT_ROOT, 'outputs', 'plots')
+    image_extensions = {'.png', '.jpg', '.jpeg', '.svg', '.webp'}
+    plots = []
+    if os.path.isdir(plots_dir):
+        for f in sorted(os.listdir(plots_dir)):
+            ext = os.path.splitext(f)[1].lower()
+            if ext in image_extensions:
+                try:
+                    stat = os.stat(os.path.join(plots_dir, f))
+                    title = os.path.splitext(f)[0].replace('_', ' ').title()
+                    plots.append({
+                        'filename': f,
+                        'url': f'/outputs/plots/{f}',
+                        'title': title,
+                        'modified': stat.st_mtime,
+                        'size': stat.st_size,
+                    })
+                except OSError:
+                    continue
+    return jsonify({'plots': plots, 'count': len(plots)})
+
+
 @app.route('/outputs/plots/<path:filename>')
 def serve_plot(filename):
     """Serve training plots from the outputs/plots directory."""
